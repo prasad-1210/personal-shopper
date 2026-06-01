@@ -1,0 +1,143 @@
+# LOCAL DEVELOPMENT PATHS:
+# PATH 1 — Fastest (no Docker):  bash scripts/dev-multiagent.sh
+# PATH 2 — Docker Compose:       docker compose up (all agents as services)
+# PATH 3 — Docker Desktop K8s:   bash deploy/scripts/local-setup.sh
+
+version: "3.9"
+
+x-agent-base: &agent-base
+  build:
+    context: .
+    dockerfile: Dockerfile.agent
+  env_file: .env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: langgraph
+      POSTGRES_PASSWORD: langgraph
+      POSTGRES_DB: langgraph
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langgraph"]
+      interval: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  nutrition-agent:
+    <<: *agent-base
+    environment:
+      REDIS_URI: redis://redis:6379
+      DATABASE_URI: postgres://langgraph:langgraph@postgres:5432/langgraph
+      LANGGRAPH_GRAPH_ID: nutrition_agent
+    command: >
+      sh -c "cd agents/nutrition_agent && langgraph dev --host 0.0.0.0 --port 8000 --no-browser
+             --config langgraph.json"
+    ports: ["22001:8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 10s
+      retries: 8
+      start_period: 30s
+
+  recipe-agent:
+    <<: *agent-base
+    environment:
+      REDIS_URI: redis://redis:6379/1
+      DATABASE_URI: postgres://langgraph:langgraph@postgres:5432/langgraph_recipe
+    command: >
+      sh -c "cd agents/recipe_agent && langgraph dev --host 0.0.0.0 --port 8000 --no-browser
+             --config langgraph.json"
+    ports: ["22002:8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 10s
+      retries: 8
+      start_period: 30s
+
+  shopping-agent:
+    <<: *agent-base
+    environment:
+      REDIS_URI: redis://redis:6379/2
+      DATABASE_URI: postgres://langgraph:langgraph@postgres:5432/langgraph_shopping
+    command: >
+      sh -c "cd agents/shopping_agent && langgraph dev --host 0.0.0.0 --port 8000 --no-browser
+             --config langgraph.json"
+    ports: ["22003:8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 10s
+      retries: 8
+      start_period: 30s
+
+  budget-agent:
+    <<: *agent-base
+    environment:
+      REDIS_URI: redis://redis:6379/3
+      DATABASE_URI: postgres://langgraph:langgraph@postgres:5432/langgraph_budget
+    command: >
+      sh -c "cd agents/budget_agent && langgraph dev --host 0.0.0.0 --port 8000 --no-browser
+             --config langgraph.json"
+    ports: ["22004:8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 10s
+      retries: 8
+      start_period: 30s
+
+  supervisor:
+    <<: *agent-base
+    environment:
+      REDIS_URI: redis://redis:6379/4
+      DATABASE_URI: postgres://langgraph:langgraph@postgres:5432/langgraph_supervisor
+      NUTRITION_AGENT_URL: http://nutrition-agent:8000
+      RECIPE_AGENT_URL: http://recipe-agent:8000
+      SHOPPING_AGENT_URL: http://shopping-agent:8000
+      BUDGET_AGENT_URL: http://budget-agent:8000
+    command: >
+      sh -c "cd supervisor && langgraph dev --host 0.0.0.0 --port 8000 --no-browser
+             --config langgraph.json"
+    ports: ["22000:8000"]
+    depends_on:
+      nutrition-agent:
+        condition: service_healthy
+      recipe-agent:
+        condition: service_healthy
+      shopping-agent:
+        condition: service_healthy
+      budget-agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/ok"]
+      interval: 10s
+      retries: 10
+      start_period: 60s
+
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    ports: ["22005:22005"]
+    env_file:
+      - ui/.env
+    environment:
+      PORT: "22005"
+      LANGGRAPH_URL: http://supervisor:8000
+    depends_on:
+      supervisor:
+        condition: service_healthy

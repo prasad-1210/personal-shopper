@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "langgraph-primitives.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "langgraph-primitives.labels" . | nindent 4 }}
+data:
+  LANGSMITH_TRACING: {{ .Values.langsmith.tracing | default "true" | quote }}
+  LANGSMITH_ENDPOINT: {{ .Values.langsmith.endpoint | quote }}
+  LANGSMITH_PROJECT: {{ .Values.langsmith.project | quote }}
+  AGENT_NAME: {{ include "langgraph-primitives.agentName" . | quote }}
+  AGENT_TYPE: {{ .Values.agent.type | default "sub-agent" | quote }}
+  RECIPE_PROVIDER: {{ .Values.recipeProvider | default "edamam" | quote }}
+  USE_MOCK_TOOLS: {{ .Values.useMockTools | default "false" | quote }}
+  {{- if .Values.interAgent.supervisorUrl }}
+  LANGGRAPH_URL: {{ .Values.interAgent.supervisorUrl | quote }}
+  {{- end }}
+  {{- if .Values.interAgent.nutritionAgentUrl }}
+  NUTRITION_AGENT_URL: {{ .Values.interAgent.nutritionAgentUrl | quote }}
+  {{- end }}
+  {{- if .Values.interAgent.recipeAgentUrl }}
+  RECIPE_AGENT_URL: {{ .Values.interAgent.recipeAgentUrl | quote }}
+  {{- end }}
+  {{- if .Values.interAgent.shoppingAgentUrl }}
+  SHOPPING_AGENT_URL: {{ .Values.interAgent.shoppingAgentUrl | quote }}
+  {{- end }}
+  {{- if .Values.interAgent.budgetAgentUrl }}
+  BUDGET_AGENT_URL: {{ .Values.interAgent.budgetAgentUrl | quote }}
+  {{- end }}
+  {{- with .Values.configMap.data }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}

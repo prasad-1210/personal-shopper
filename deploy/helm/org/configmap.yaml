@@ -1,0 +1,10 @@
+configMap:
+  data:
+    LOG_LEVEL: INFO
+    LOG_FORMAT: json
+    ORG_NAME: personal-shopper-org
+    ENVIRONMENT: dev
+    LANGGRAPH_CHECKPOINTER: postgres
+    ENABLE_DISTRIBUTED_TRACING: "true"
+    ENABLE_HUMAN_IN_THE_LOOP: "false"
+    ENABLE_MULTI_RETAILER: "true"

@@ -1,0 +1,5 @@
+configMap:
+  data:
+    AGENT_ROLE: recipe-finder
+    RECIPE_MAX_READY_MINUTES: "90"
+    RECIPE_RESULT_COUNT: "3"

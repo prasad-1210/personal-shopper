@@ -1,0 +1,4 @@
+configMap:
+  data:
+    ENVIRONMENT: local
+    LOG_LEVEL: DEBUG

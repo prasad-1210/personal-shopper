@@ -1,0 +1,14 @@
+image:
+  pullPolicy: Never    # use images built locally (docker build / langgraph build)
+
+podSecurityContext:
+  runAsNonRoot: false
+
+redis:
+  externalName: redis-master.agents-dev.svc.cluster.local
+
+postgres:
+  externalName: postgres-postgresql.agents-dev.svc.cluster.local
+
+agentNetworkPolicy:
+  enabled: false

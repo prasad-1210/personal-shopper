@@ -1,0 +1,5 @@
+configMap:
+  data:
+    AGENT_ROLE: budget-validator
+    BUDGET_CURRENCY: USD
+    BUDGET_OVERAGE_THRESHOLD: "0.10"

@@ -1,0 +1,4 @@
+configMap:
+  data:
+    ENVIRONMENT: dev
+    LOG_LEVEL: INFO

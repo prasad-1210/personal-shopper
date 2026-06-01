@@ -1,0 +1,6 @@
+configMap:
+  data:
+    AGENT_ROLE: user-interface
+    UI_MAX_CHAT_HISTORY: "20"
+    UI_SHOW_AGENT_STEPS: "true"
+    UI_SHOW_TRACE_LINK: "true"

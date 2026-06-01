@@ -1,0 +1,31 @@
+agent:
+  name: nutrition-agent
+  graphId: nutrition_agent
+  type: sub-agent
+  port: 8000
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-nutrition
+  tag: latest
+  pullPolicy: Always
+
+secretName: nutrition-agent-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-nutrition-dev
+
+redis:
+  dbIndex: 1
+
+postgres:
+  database: langgraph_nutrition
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

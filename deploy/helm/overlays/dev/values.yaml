@@ -1,0 +1,20 @@
+image:
+  pullPolicy: Always
+  pullSecrets:
+    - name: acr-pull-secret
+
+# wolfi images require root — do not override org runAsNonRoot: false
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+
+redis:
+  externalName: dev-redis.redis.cache.windows.net
+  port: 6380
+
+postgres:
+  externalName: dev-postgres.postgres.database.azure.com
+
+agentNetworkPolicy:
+  enabled: true
+  allowFromNamespace: agents-dev

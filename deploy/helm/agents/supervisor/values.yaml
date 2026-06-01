@@ -1,0 +1,37 @@
+agent:
+  name: supervisor
+  graphId: personal_shopper
+  type: supervisor
+  port: 8000
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-supervisor
+  tag: latest
+  pullPolicy: Always
+
+secretName: supervisor-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-supervisor-dev
+
+redis:
+  dbIndex: 0
+
+postgres:
+  database: langgraph_supervisor
+
+interAgent:
+  nutritionAgentUrl: http://nutrition-agent:8000
+  recipeAgentUrl: http://recipe-agent:8000
+  shoppingAgentUrl: http://shopping-agent:8000
+  budgetAgentUrl: http://budget-agent:8000
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi

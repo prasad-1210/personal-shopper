@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Shopper</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #718096;
+      --green: #16a34a;
+      --green-l: #dcfce7;
+      --orange: #ea580c;
+      --orange-l: #fff7ed;
+      --red: #dc2626;
+      --sidebar-w: 260px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+    .btn:hover { background: var(--bg); }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 1rem;
+      flex-shrink: 0;
+    }
+    .section { margin-bottom: 1.25rem; }
+    .section-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .retailer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+    }
+    .retailer-btn, .diet-chip {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 0.45rem 0.35rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .retailer-btn.active, .diet-chip.active {
+      border-color: var(--accent);
+      background: #eef2ff;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .diet-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .diet-chip { padding: 0.35rem 0.55rem; }
+    .input-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .input-prefix {
+      padding: 0.45rem 0.5rem;
+      color: var(--muted);
+      font-size: 0.875rem;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .sidebar input[type="number"],
+    .sidebar input[type="text"] {
+      border: none;
+      background: transparent;
+      padding: 0.45rem 0.5rem;
+      width: 100%;
+      font-size: 0.875rem;
+      outline: none;
+    }
+    .sidebar-field {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.5rem;
+      font-size: 0.875rem;
+      background: var(--surface);
+    }
+    .sidebar-field:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .sidebar-hint {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+    .badges { display: flex; flex-wrap: wrap; gap: 0.35rem; min-height: 1.5rem; }
+    .badge {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      background: var(--green-l);
+      color: var(--green);
+      font-weight: 500;
+    }
+    .badges-empty { font-size: 0.75rem; color: var(--muted); }
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .welcome {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 520px;
+      margin: 0 auto 1rem;
+      text-align: center;
+    }
+    .welcome h2 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    .welcome p { color: var(--muted); font-size: 0.875rem; margin-bottom: 1rem; }
+    .examples { display: flex; flex-direction: column; gap: 0.5rem; }
+    .example-chip {
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      text-align: left;
+      background: var(--bg);
+    }
+    .example-chip:hover { border-color: var(--accent); color: var(--accent); }
+    .bubble {
+      max-width: 78%;
+      padding: 0.75rem 1rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      background: var(--accent);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.agent {
+      align-self: flex-start;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+    .bubble.agent :is(h2,h3) { margin: 0.5rem 0 0.35rem; font-size: 1rem; }
+    .bubble.agent ul { margin-left: 1.25rem; }
+    .bubble.error {
+      align-self: center;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: var(--red);
+      max-width: 90%;
+    }
+    .bubble.thinking { color: var(--muted); font-style: italic; }
+    .meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.35rem; align-self: flex-start; }
+    .violations { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; align-self: flex-start; max-width: 78%; }
+    .violation-pill {
+      font-size: 0.7rem;
+      background: #fef2f2;
+      color: var(--red);
+      border: 1px solid #fecaca;
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+    }
+    .steps-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      min-height: 2.5rem;
+      align-items: center;
+    }
+    .step-pill {
+      font-size: 0.65rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .step-pill.done { background: var(--green-l); color: var(--green); border-color: #bbf7d0; }
+    .step-pill.running { background: var(--orange-l); color: var(--orange); border-color: #fed7aa; }
+    .input-area {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      align-items: flex-end;
+    }
+    #message-input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.6rem 0.75rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      resize: none;
+      max-height: 120px;
+      outline: none;
+    }
+    #message-input:focus { border-color: var(--accent); }
+    .trace-link {
+      text-align: left;
+      padding: 0 1.25rem 0.5rem;
+    }
+    .trace-link a {
+      font-size: 11px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .trace-link a:hover {
+      color: var(--accent);
+    }
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🛒 Personal Shopper</div>
+    <button class="btn" id="new-chat-btn" type="button">New Chat</button>
+  </header>
+
+  <div class="main">
+    <aside class="sidebar">
+      <div class="section">
+        <div class="section-title">ZIP CODE</div>
+        <input type="text" id="zip-code" class="sidebar-field" inputmode="numeric"
+          pattern="[0-9]{5}" maxlength="5" placeholder="94103" value="94103"
+          autocomplete="postal-code" />
+        <p class="sidebar-hint">Used only if your message does not specify a zip.</p>
+      </div>
+
+      <div class="section">
+        <div class="section-title">RETAILER</div>
+        <div class="retailer-grid" id="retailer-grid">
+          <button type="button" class="retailer-btn active" data-retailer="kroger">Kroger</button>
+          <button type="button" class="retailer-btn" data-retailer="walmart">Walmart</button>
+          <button type="button" class="retailer-btn" data-retailer="target">Target</button>
+          <button type="button" class="retailer-btn" data-retailer="costco">Costco</button>
+          <button type="button" class="retailer-btn" data-retailer="amazon">Amazon</button>
+          <button type="button" class="retailer-btn" data-retailer="bestbuy">Best Buy</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">DIET PROFILE</div>
+        <div class="diet-chips" id="diet-chips">
+          <button type="button" class="diet-chip active" data-diet="none">None</button>
+          <button type="button" class="diet-chip" data-diet="diabetic">Diabetic</button>
+          <button type="button" class="diet-chip" data-diet="vegan">Vegan</button>
+          <button type="button" class="diet-chip" data-diet="vegetarian">Vegetarian</button>
+          <button type="button" class="diet-chip" data-diet="low-carb">Low-Carb</button>
+          <button type="button" class="diet-chip" data-diet="keto">Keto</button>
+          <button type="button" class="diet-chip" data-diet="gluten-free">Gluten-Free</button>
+          <button type="button" class="diet-chip" data-diet="dairy-free">Dairy-Free</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">BUDGET</div>
+        <div class="input-wrap">
+          <span class="input-prefix">$</span>
+          <input type="number" id="budget" min="0" step="1" placeholder="No limit" />
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">MAX CALORIES</div>
+        <input type="number" id="calories" class="sidebar-field" min="0" step="50"
+          placeholder="No limit (per serving)" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">SERVING SIZE</div>
+        <input type="number" id="servings" class="sidebar-field" min="1" value="4" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">ACTIVE CONSTRAINTS</div>
+        <div class="badges" id="active-badges">
+          <span class="badges-empty">None set</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="chat-panel">
+      <div class="messages" id="messages">
+        <div class="welcome" id="welcome">
+          <h2>Personal Shopper Agent</h2>
+          <p>Powered by LangGraph + LangSmith</p>
+          <div class="examples">
+            <button type="button" class="example-chip" data-prompt="Palak paneer for 4 near 75035">
+              Palak paneer for 4 near 75035
+            </button>
+            <button type="button" class="example-chip" data-prompt="Low-carb chicken dinner under $30 at Walmart">
+              Low-carb chicken dinner under $30 at Walmart
+            </button>
+            <button type="button" class="example-chip" data-prompt="Vegan pasta for 2, budget $20, near 94103">
+              Vegan pasta for 2, budget $20, near 94103
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps-bar" id="steps-bar"></div>
+
+      <div class="input-area">
+        <textarea id="message-input" rows="1" placeholder="What would you like to cook?"></textarea>
+        <button class="btn btn-primary" id="send-btn" type="button">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STEP_ORDER = [
+      'parse_request', 'find_store', 'supervisor',
+      'nutrition_agent', 'recipe_agent', 'shopping_agent',
+      'budget_agent', 'finish_node'
+    ];
+
+    let threadId = crypto.randomUUID();
+    let activeRetailer = 'kroger';
+    let activeDiet = 'none';
+    let sending = false;
+
+    const messagesEl = document.getElementById('messages');
+    const welcomeEl = document.getElementById('welcome');
+    const inputEl = document.getElementById('message-input');
+    const stepsBar = document.getElementById('steps-bar');
+    const badgesEl = document.getElementById('active-badges');
+
+    function getSidebarZip() {
+      const raw = document.getElementById('zip-code').value.trim().replace(/\D/g, '');
+      return raw.length === 5 ? raw : '';
+    }
+
+    function buildConstraintPrefix() {
+      const parts = [];
+      const zip = getSidebarZip();
+      if (zip) parts.push(`Zip: ${zip}`);
+      if (activeRetailer !== 'kroger') parts.push(`Retailer: ${activeRetailer}`);
+      if (activeDiet && activeDiet !== 'none') parts.push(`Diet: ${activeDiet}`);
+      const budget = document.getElementById('budget').value;
+      if (budget) parts.push(`Budget: $${budget}`);
+      const cal = document.getElementById('calories').value;
+      if (cal) parts.push(`Max calories: ${cal}/serving`);
+      const srv = document.getElementById('servings').value;
+      if (srv) parts.push(`Servings: ${srv}`);
+      if (parts.length === 0) return '';
+      return `[${parts.join(' | ')}]\n\n`;
+    }
+
+    function updateActiveBadges() {
+      const parts = [];
+      const zip = getSidebarZip();
+      if (zip) parts.push({ label: `zip ${zip}`, key: 'zip' });
+      if (activeRetailer !== 'kroger') parts.push({ label: activeRetailer, key: 'retailer' });
+      if (activeDiet && activeDiet !== 'none') parts.push({ label: activeDiet, key: 'diet' });
+      const budget = document.getElementById('budget').value;
+      if (budget) parts.push({ label: `$${budget} budget`, key: 'budget' });
+      const cal = document.getElementById('calories').value;
+      if (cal) parts.push({ label: `${cal} cal/serving`, key: 'cal' });
+      const srv = document.getElementById('servings').value;
+      if (srv) parts.push({ label: `${srv} servings`, key: 'srv' });
+
+      badgesEl.innerHTML = '';
+      if (parts.length === 0) {
+        badgesEl.innerHTML = '<span class="badges-empty">None set</span>';
+        return;
+      }
+      parts.forEach(p => {
+        const b = document.createElement('span');
+        b.className = 'badge';
+        b.textContent = p.label;
+        badgesEl.appendChild(b);
+      });
+    }
+
+    function stepKeyFromEntry(entry) {
+      if (!entry) return '';
+      if (entry.startsWith('supervisor→')) return 'supervisor';
+      if (entry.startsWith('nutrition_agent')) return 'nutrition_agent';
+      if (entry.startsWith('recipe_agent')) return 'recipe_agent';
+      return entry.split(':')[0];
+    }
+
+    function updateSteps(agentSteps) {
+      const doneKeys = new Set((agentSteps || []).map(stepKeyFromEntry));
+      let lastDone = '';
+      for (let i = STEP_ORDER.length - 1; i >= 0; i--) {
+        if (doneKeys.has(STEP_ORDER[i])) {
+          lastDone = STEP_ORDER[i];
+          break;
+        }
+      }
+
+      stepsBar.innerHTML = '';
+      STEP_ORDER.forEach(step => {
+        const pill = document.createElement('span');
+        pill.className = 'step-pill';
+        pill.textContent = step.replace('_', ' ');
+        if (doneKeys.has(step)) {
+          pill.classList.add(step === lastDone ? 'running' : 'done');
+          if (step !== lastDone) pill.classList.remove('running');
+          if (step === lastDone && agentSteps && agentSteps[agentSteps.length - 1] === 'finish_node') {
+            pill.classList.remove('running');
+            pill.classList.add('done');
+          }
+        }
+        stepsBar.appendChild(pill);
+      });
+    }
+
+    function resetSteps() {
+      stepsBar.innerHTML = '';
+      STEP_ORDER.forEach(step => {
+        const pill = document.createElement('span');
+        pill.className = 'step-pill';
+        pill.textContent = step.replace('_', ' ');
+        stepsBar.appendChild(pill);
+      });
+    }
+
+    function scrollBottom() {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function appendBubble(text, type) {
+      if (welcomeEl) welcomeEl.remove();
+      const el = document.createElement('div');
+      el.className = `bubble ${type}`;
+      if (type === 'agent') {
+        el.innerHTML = marked.parse(text);
+      } else if (type === 'thinking') {
+        el.textContent = text;
+      } else {
+        el.textContent = text;
+      }
+      messagesEl.appendChild(el);
+      scrollBottom();
+      return el;
+    }
+
+    async function sendMessage(displayText, apiText) {
+      if (sending || !displayText.trim()) return;
+      sending = true;
+      document.getElementById('send-btn').disabled = true;
+
+      appendBubble(displayText.trim(), 'user');
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+
+      const thinking = appendBubble('Thinking…', 'thinking');
+      let dot = 0;
+      const dotTimer = setInterval(() => {
+        dot = (dot + 1) % 4;
+        thinking.textContent = 'Thinking' + '.'.repeat(dot || 1);
+      }, 400);
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: apiText || displayText,
+            thread_id: threadId,
+          }),
+        });
+        const data = await res.json();
+        clearInterval(dotTimer);
+        thinking.remove();
+
+        if (!res.ok) {
+          appendBubble(data.detail || 'Request failed', 'error');
+        } else {
+          appendBubble(data.reply, 'agent');
+          updateSteps(data.agent_steps || []);
+          if (data.constraint_violations && data.constraint_violations.length) {
+            const vDiv = document.createElement('div');
+            vDiv.className = 'violations';
+            data.constraint_violations.forEach(v => {
+              const p = document.createElement('span');
+              p.className = 'violation-pill';
+              p.textContent = v;
+              vDiv.appendChild(p);
+            });
+            messagesEl.appendChild(vDiv);
+          }
+          if (data.iteration > 1) {
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            meta.textContent = `Refined over ${data.iteration} iterations`;
+            messagesEl.appendChild(meta);
+          }
+          if (data.langsmith_url) {
+            const traceLink = document.createElement('div');
+            traceLink.className = 'trace-link';
+            traceLink.innerHTML = `
+              <a href="${data.langsmith_url}" target="_blank" rel="noopener">
+                View trace in LangSmith ↗
+              </a>`;
+            messagesEl.appendChild(traceLink);
+          }
+          scrollBottom();
+        }
+      } catch (err) {
+        clearInterval(dotTimer);
+        thinking.remove();
+        appendBubble(String(err.message || err), 'error');
+      } finally {
+        sending = false;
+        document.getElementById('send-btn').disabled = false;
+      }
+    }
+
+    document.getElementById('send-btn').addEventListener('click', () => {
+      const display = inputEl.value.trim();
+      if (!display) return;
+      const prefix = buildConstraintPrefix();
+      sendMessage(display, prefix + display);
+    });
+
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('send-btn').click();
+      }
+    });
+
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+    });
+
+    const WELCOME_HTML = document.getElementById('welcome').innerHTML;
+
+    document.getElementById('new-chat-btn').addEventListener('click', () => {
+      threadId = crypto.randomUUID();
+      messagesEl.innerHTML = '';
+      const w = document.createElement('div');
+      w.className = 'welcome';
+      w.id = 'welcome';
+      w.innerHTML = WELCOME_HTML;
+      messagesEl.appendChild(w);
+      document.querySelectorAll('.example-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          inputEl.value = chip.dataset.prompt;
+          inputEl.focus();
+        });
+      });
+      resetSteps();
+      inputEl.value = '';
+    });
+
+    document.querySelectorAll('.retailer-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.retailer-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeRetailer = btn.dataset.retailer;
+        updateActiveBadges();
+      });
+    });
+
+    document.querySelectorAll('.diet-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.diet-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        activeDiet = chip.dataset.diet;
+        updateActiveBadges();
+      });
+    });
+
+    const zipInput = document.getElementById('zip-code');
+    zipInput.addEventListener('input', () => {
+      zipInput.value = zipInput.value.replace(/\D/g, '').slice(0, 5);
+      updateActiveBadges();
+    });
+    ['budget', 'calories', 'servings'].forEach(id => {
+      document.getElementById(id).addEventListener('input', updateActiveBadges);
+    });
+
+    document.querySelectorAll('.example-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        inputEl.value = chip.dataset.prompt;
+        inputEl.focus();
+      });
+    });
+
+    resetSteps();
+    updateActiveBadges();
+  </script>
+</body>
+</html>

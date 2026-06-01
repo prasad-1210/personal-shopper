@@ -1,0 +1,86 @@
+# ORG-LEVEL VALUES — platform team only
+
+image:
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+# Pod security — langgraph build / wolfi images run as root
+# runAsNonRoot MUST be false — wolfi does not support non-root execution
+# Platform note: upstream constraint from langchain/langgraph-api wolfi base
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  fsGroup: 0
+  # seccompProfile:
+  #   type: RuntimeDefault
+  # NOTE: disabled — langgraph wolfi images may not support RuntimeDefault
+  # seccomp on all AKS node pool configurations. Enable per-cluster after
+  # confirming compatibility with your node pool OS SKU.
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false   # wolfi writes /tmp and runtime cache files
+  capabilities:
+    drop: ["ALL"]
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podLabels:
+  org/managed-by: platform-team
+  org/phase: "1"
+
+podAnnotations:
+  org/repo: personal-shopper
+
+langsmith:
+  tracing: "true"
+  endpoint: https://api.smith.langchain.com
+
+# Default secret name; each agent may override in agents/<name>/values.yaml
+secretName: personal-shopper-secrets
+
+# ExternalName DNS only — REDIS_URI / DATABASE_URI come from the agent secret
+redis:
+  enabled: true
+  externalName: redis-master.agents-dev.svc.cluster.local
+  port: 6379
+
+postgres:
+  enabled: true
+  externalName: postgres-postgresql.agents-dev.svc.cluster.local
+  port: 5432
+  user: langgraph
+
+healthProbe:
+  path: /ok
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+startupProbe:
+  path: /ok
+  failureThreshold: 30
+  periodSeconds: 5
+
+terminationGracePeriodSeconds: 60
+
+agentNetworkPolicy:
+  enabled: false
+  allowFromNamespace: agents-dev
+  allowFromSelector:
+    app.kubernetes.io/component: supervisor

@@ -1,0 +1,89 @@
+# k8s-primitives schema — merged via langgraph-primitives and layered values
+
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  fsGroup: 0
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+env: []
+envFrom: []
+
+livenessProbe: {}
+readinessProbe: {}
+startupProbe: {}
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: false
+  minAvailable: 1
+
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+  tls: []
+
+configMap:
+  data: {}
+
+secretName: ""
+secretRefReminder: false
+
+volumes: []
+volumeMounts: []
+lifecycle: {}
+terminationGracePeriodSeconds: 30
+priorityClassName: ""

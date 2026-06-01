@@ -1,0 +1,39 @@
+# Canonical LangGraph agent registry (build + routing metadata).
+# Per-agent Helm: deploy/helm/agents/<folder>/values.yaml (see scripts/langgraph-agents.py HELM_AGENT_DIRS)
+#
+# CI/CD reads this file for image builds; Helm uses values.yaml for Kubernetes.
+
+agents:
+  - id: supervisor
+    graphId: personal_shopper
+    role: entrypoint
+    build:
+      config: supervisor/langgraph.json
+
+  - id: nutrition
+    graphId: nutrition_agent
+    role: remote
+    remoteEnv: NUTRITION_AGENT_URL
+    build:
+      config: agents/nutrition_agent/langgraph.json
+
+  - id: recipe
+    graphId: recipe_agent
+    role: remote
+    remoteEnv: RECIPE_AGENT_URL
+    build:
+      config: agents/recipe_agent/langgraph.json
+
+  - id: shopping
+    graphId: shopping_agent
+    role: remote
+    remoteEnv: SHOPPING_AGENT_URL
+    build:
+      config: agents/shopping_agent/langgraph.json
+
+  - id: budget
+    graphId: budget_agent
+    role: remote
+    remoteEnv: BUDGET_AGENT_URL
+    build:
+      config: agents/budget_agent/langgraph.json

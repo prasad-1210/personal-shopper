@@ -1,0 +1,45 @@
+agent:
+  name: ui
+  graphId: ""
+  type: ui
+  port: 22005
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-ui
+  tag: latest
+  pullPolicy: Always
+
+secretName: ui-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-ui-dev
+
+redis:
+  enabled: false
+
+postgres:
+  enabled: false
+
+interAgent:
+  supervisorUrl: http://supervisor:8000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

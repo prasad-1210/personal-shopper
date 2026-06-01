@@ -1,0 +1,6 @@
+dependencies:
+- name: k8s-primitives
+  repository: file://../k8s-primitives
+  version: 1.0.0
+digest: sha256:0118faeadfafcb16278cd1cd77cbb25d6c4ed6a27ebcf9a6b9695567c806fff0
+generated: "2026-06-01T03:32:26.614035-05:00"

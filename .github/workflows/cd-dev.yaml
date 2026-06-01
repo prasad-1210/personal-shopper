@@ -1,0 +1,108 @@
+name: CD — Build and push (dev)
+
+on:
+  push:
+    branches: [master, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}/personal-shopper
+  UI_IMAGE: ghcr.io/${{ github.repository }}/personal-shopper-ui
+
+jobs:
+  build-and-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install langgraph-cli
+        run: pip install "langgraph-cli>=0.2.11" pyyaml
+
+      - name: Build LangGraph agent images (wolfi via langgraph build)
+        env:
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        run: |
+          # langgraph build uses image_distro from each langgraph.json (wolfi base).
+          # scripts/build-agent-images.sh passes --platform linux/amd64 --pull.
+          bash scripts/build-agent-images.sh --tag "${{ github.sha }}"
+
+      - name: Tag and push agent images
+        env:
+          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+        run: |
+          pip install pyyaml
+          mapfile -t ids < <(python3 scripts/langgraph-agents.py ids)
+          for id in "${ids[@]}"; do
+            docker tag "${IMAGE_PREFIX}-${id}:${{ github.sha }}" "${IMAGE_PREFIX}-${id}:dev"
+            docker push "${IMAGE_PREFIX}-${id}:${{ github.sha }}"
+            docker push "${IMAGE_PREFIX}-${id}:dev"
+          done
+
+      - name: Build and push UI image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.ui
+          push: true
+          tags: |
+            ${{ env.UI_IMAGE }}:${{ github.sha }}
+            ${{ env.UI_IMAGE }}:dev
+
+  helm-validate:
+    name: Helm validate (post-build)
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Helm lint and template (supervisor, local)
+        run: |
+          helm lint deploy/helm/charts/langgraph-primitives \
+            -f deploy/helm/org/values.yaml \
+            -f deploy/helm/overlays/local/values.yaml \
+            -f deploy/helm/agents/supervisor/values.yaml \
+            -f deploy/helm/org/configmap.yaml \
+            -f deploy/helm/overlays/local/configmap.yaml \
+            -f deploy/helm/agents/supervisor/configmap.yaml
+          helm template supervisor deploy/helm/charts/langgraph-primitives \
+            --namespace agents-dev \
+            -f deploy/helm/org/values.yaml \
+            -f deploy/helm/overlays/local/values.yaml \
+            -f deploy/helm/agents/supervisor/values.yaml \
+            -f deploy/helm/org/configmap.yaml \
+            -f deploy/helm/overlays/local/configmap.yaml \
+            -f deploy/helm/agents/supervisor/configmap.yaml \
+            --set image.repository=${{ env.IMAGE_PREFIX }}-supervisor \
+            --set image.tag=${{ github.sha }} \
+            > /dev/null
+
+  deploy-instructions:
+    name: Deployment instructions
+    runs-on: ubuntu-latest
+    needs: [build-and-push, helm-validate]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print deploy command
+        run: |
+          echo "Images pushed (one image per agent in deploy/agents.manifest.yaml + UI)."
+          echo ""
+          echo "bash deploy/scripts/helm-deploy-all.sh local"
+          echo "# Or per agent:"
+          echo "IMAGE_TAG=${{ github.sha }} IMAGE_REPOSITORY=${{ env.IMAGE_PREFIX }}-supervisor \\"
+          echo "  bash deploy/scripts/helm-deploy.sh supervisor local"

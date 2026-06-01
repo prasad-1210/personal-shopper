@@ -1,0 +1,5 @@
+configMap:
+  data:
+    AGENT_ROLE: availability-checker
+    DEFAULT_RETAILER: kroger
+    ENABLE_MULTI_RETAILER: "true"

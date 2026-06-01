@@ -1,0 +1,4 @@
+configMap:
+  data:
+    AGENT_ROLE: nutrition-interpreter
+    NUTRITION_MODEL: gpt-4o-mini

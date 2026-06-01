@@ -1,0 +1,6 @@
+configMap:
+  data:
+    AGENT_ROLE: orchestrator
+    MAX_ITERATIONS: "3"
+    SUPERVISOR_MODEL: gpt-4o-mini
+    SUPERVISOR_TEMPERATURE: "0"

@@ -1,0 +1,31 @@
+agent:
+  name: budget-agent
+  graphId: budget_agent
+  type: sub-agent
+  port: 8000
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-budget
+  tag: latest
+  pullPolicy: Always
+
+secretName: budget-agent-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-budget-dev
+
+redis:
+  dbIndex: 4
+
+postgres:
+  database: langgraph_budget
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

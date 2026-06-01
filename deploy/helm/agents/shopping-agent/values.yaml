@@ -1,0 +1,31 @@
+agent:
+  name: shopping-agent
+  graphId: shopping_agent
+  type: sub-agent
+  port: 8000
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-shopping
+  tag: latest
+  pullPolicy: Always
+
+secretName: shopping-agent-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-shopping-dev
+
+redis:
+  dbIndex: 3
+
+postgres:
+  database: langgraph_shopping
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi

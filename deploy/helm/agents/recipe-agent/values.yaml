@@ -1,0 +1,33 @@
+agent:
+  name: recipe-agent
+  graphId: recipe_agent
+  type: sub-agent
+  port: 8000
+
+image:
+  repository: ghcr.io/<YOUR_ORG>/personal-shopper-recipe
+  tag: latest
+  pullPolicy: Always
+
+secretName: recipe-agent-secrets
+
+replicaCount: 1
+
+langsmith:
+  project: personal-shopper-recipe-dev
+
+redis:
+  dbIndex: 2
+
+postgres:
+  database: langgraph_recipe
+
+recipeProvider: edamam
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

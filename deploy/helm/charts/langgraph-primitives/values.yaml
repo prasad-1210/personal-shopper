@@ -1,0 +1,107 @@
+# langgraph-primitives defaults (platform schema — app teams override in agents/<name>/)
+
+agent:
+  name: ""
+  graphId: ""
+  port: 8000
+  type: sub-agent
+
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+replicaCount: 1
+
+langsmith:
+  tracing: "true"
+  endpoint: https://api.smith.langchain.com
+  project: ""
+
+# Backing services — ExternalName services provide in-cluster DNS only.
+# REDIS_URI and DATABASE_URI are full strings in the agent K8s secret (not assembled here).
+redis:
+  enabled: true
+  externalName: ""       # e.g. redis-master.agents-dev.svc.cluster.local
+  port: 6379
+  dbIndex: 0             # documented per agent; actual URI is in secret
+
+postgres:
+  enabled: true
+  externalName: ""       # e.g. postgres-postgresql.agents-dev.svc.cluster.local
+  port: 5432
+  database: ""           # documented per agent; actual URI is in secret
+  user: langgraph
+
+interAgent: {}
+
+secretName: personal-shopper-secrets
+secretRefReminder: false
+
+recipeProvider: edamam
+useMockTools: "false"
+
+healthProbe:
+  path: /ok
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+startupProbe:
+  path: /ok
+  failureThreshold: 30
+  periodSeconds: 5
+
+uiHealthProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+podSecurityContext: {}
+containerSecurityContext: {}
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+agentNetworkPolicy:
+  enabled: false
+  allowFromNamespace: agents-dev
+  allowFromSelector:
+    app.kubernetes.io/component: supervisor
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 60
+
+pdb:
+  enabled: false
+  minAvailable: 1
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts: []
+  tls: []
+
+configMap:
+  data: {}
+
+terminationGracePeriodSeconds: 30

@@ -1,0 +1,5 @@
+configMap:
+  data:
+    ENVIRONMENT: prod
+    LOG_LEVEL: WARN
+    ENABLE_HUMAN_IN_THE_LOOP: "true"

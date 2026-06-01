@@ -1,0 +1,9 @@
+{
+  "dependencies": ["..", "../shared"],
+  "graphs": {
+    "personal_shopper": "./graph.py:graph"
+  },
+  "env": "../.env",
+  "image_distro": "wolfi",
+  "python_version": "3.12"
+}

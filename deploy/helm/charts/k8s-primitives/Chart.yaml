@@ -1,0 +1,7 @@
+apiVersion: v2
+name: k8s-primitives
+description: >
+  Pure Kubernetes primitive templates (library chart).
+  No application or framework awareness. Platform team owns.
+type: library
+version: 1.0.0

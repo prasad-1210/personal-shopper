@@ -1,0 +1,126 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langgraph-primitives.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "langgraph-primitives.labels" . | nindent 4 }}
+  annotations:
+    langgraph/graph-id: {{ .Values.agent.graphId | default .Values.agent.name | quote }}
+    langgraph/agent-type: {{ .Values.agent.type | default "sub-agent" | quote }}
+spec:
+  replicas: {{ .Values.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "langgraph-primitives.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "langgraph-primitives.labels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "langgraph-primitives.fullname" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "langgraph-primitives.agentName" . }}
+          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ include "langgraph-primitives.containerPort" . }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "langgraph-primitives.fullname" . }}-config
+            - secretRef:
+                name: {{ include "langgraph-primitives.secretName" . }}
+          env:
+            - name: PORT
+              value: {{ include "langgraph-primitives.containerPort" . | quote }}
+            {{- if not (eq (include "langgraph-primitives.isUi" .) "true") }}
+            - name: LANGGRAPH_GRAPH_ID
+              value: {{ .Values.agent.graphId | default .Values.agent.name | quote }}
+            # wolfi langgraph-api reads full connection strings from the secret (not assembled here)
+            - name: REDIS_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langgraph-primitives.secretName" . }}
+                  key: REDIS_URI
+            - name: DATABASE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langgraph-primitives.secretName" . }}
+                  key: DATABASE_URI
+            - name: LANGSMITH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langgraph-primitives.secretName" . }}
+                  key: LANGSMITH_API_KEY
+            - name: LANGGRAPH_CLOUD_LICENSE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langgraph-primitives.secretName" . }}
+                  key: LANGGRAPH_CLOUD_LICENSE_KEY
+                  optional: true
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if eq (include "langgraph-primitives.isUi" .) "true" }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.uiHealthProbe.path | default "/health" }}
+              port: http
+            initialDelaySeconds: {{ .Values.uiHealthProbe.initialDelaySeconds | default 10 }}
+            periodSeconds: {{ .Values.uiHealthProbe.periodSeconds | default 15 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.uiHealthProbe.path | default "/health" }}
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- else }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.healthProbe.path | default "/ok" }}
+              port: http
+            initialDelaySeconds: {{ .Values.healthProbe.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.healthProbe.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.healthProbe.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.healthProbe.timeoutSeconds | default 5 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.healthProbe.path | default "/ok" }}
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: {{ .Values.healthProbe.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.healthProbe.timeoutSeconds | default 5 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.startupProbe.path | default "/ok" }}
+              port: http
+            failureThreshold: {{ .Values.startupProbe.failureThreshold | default 30 }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds | default 5 }}
+          {{- end }}
