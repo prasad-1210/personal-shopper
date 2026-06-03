@@ -1,0 +1,73 @@
+name: Helm Validate
+
+on:
+  pull_request:
+    paths:
+      - deploy/helm/**
+      - deploy/scripts/helm-deploy*.sh
+      - .github/workflows/helm-validate.yaml
+
+jobs:
+  lint:
+    name: Helm lint — ${{ matrix.agent }} (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        agent:
+          - supervisor
+          - nutrition-agent
+          - recipe-agent
+          - shopping-agent
+          - budget-agent
+          - ui
+        env:
+          - local
+          - dev
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+
+      - name: Build chart dependencies
+        run: helm dependency build deploy/helm/charts/langgraph-primitives
+
+      - name: Helm lint
+        run: |
+          helm lint deploy/helm/charts/langgraph-primitives \
+            -f deploy/helm/org/values.yaml \
+            -f deploy/helm/overlays/${{ matrix.env }}/values.yaml \
+            -f deploy/helm/agents/${{ matrix.agent }}/values.yaml \
+            -f deploy/helm/org/configmap.yaml \
+            -f deploy/helm/overlays/${{ matrix.env }}/configmap.yaml \
+            -f deploy/helm/agents/${{ matrix.agent }}/configmap.yaml
+
+      - name: Helm template dry-run
+        run: |
+          helm template ${{ matrix.agent }} deploy/helm/charts/langgraph-primitives \
+            --namespace agents-dev \
+            -f deploy/helm/org/values.yaml \
+            -f deploy/helm/overlays/${{ matrix.env }}/values.yaml \
+            -f deploy/helm/agents/${{ matrix.agent }}/values.yaml \
+            -f deploy/helm/org/configmap.yaml \
+            -f deploy/helm/overlays/${{ matrix.env }}/configmap.yaml \
+            -f deploy/helm/agents/${{ matrix.agent }}/configmap.yaml \
+            > /tmp/${{ matrix.agent }}-${{ matrix.env }}.yaml
+          grep -q "^kind:" /tmp/${{ matrix.agent }}-${{ matrix.env }}.yaml
+
+  ownership-check:
+    name: Layer ownership hint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Summarize changed paths
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || git diff --name-only HEAD~1)
+          echo "$CHANGED"
+          PLATFORM=$(echo "$CHANGED" | grep -E '^deploy/helm/charts/|^deploy/helm/org/' || true)
+          AGENT=$(echo "$CHANGED" | grep -E '^deploy/helm/agents/' || true)
+          [[ -n "$PLATFORM" ]] && echo "⚠️ Platform layer — needs platform review"
+          [[ -n "$AGENT" ]] && echo "✅ Agent layer — app team owned"

@@ -1,14 +1,41 @@
+# Local Docker Desktop Kubernetes — agents-local namespace
+# Used by deploy/scripts/local-k8s-setup.sh
+
 image:
-  pullPolicy: Never    # use images built locally (docker build / langgraph build)
+  pullPolicy: Never
 
 podSecurityContext:
   runAsNonRoot: false
 
 redis:
-  externalName: redis-master.agents-dev.svc.cluster.local
+  enabled: true
+  externalName: redis-master.agents-local.svc.cluster.local
 
 postgres:
-  externalName: postgres-postgresql.agents-dev.svc.cluster.local
+  enabled: true
+  externalName: postgres-postgresql.agents-local.svc.cluster.local
 
 agentNetworkPolicy:
   enabled: false
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+replicaCount: 1
+
+pdb:
+  enabled: false
+
+startupProbe:
+  failureThreshold: 60
+  periodSeconds: 5
+
+healthProbe:
+  initialDelaySeconds: 45
+  periodSeconds: 10
+  failureThreshold: 6

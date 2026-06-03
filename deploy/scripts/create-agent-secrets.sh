@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Create per-agent K8s secrets with wolfi-required REDIS_URI and DATABASE_URI.
 # Usage: bash deploy/scripts/create-agent-secrets.sh [namespace]
 set -euo pipefail
@@ -21,6 +21,13 @@ REDIS_HOST="${REDIS_HOST:-redis-master.${NAMESPACE}.svc.cluster.local}"
 PG_HOST="${PG_HOST:-postgres-postgresql.${NAMESPACE}.svc.cluster.local}"
 PG_USER="${POSTGRES_USER:-langgraph}"
 PG_PASS="${POSTGRES_PASSWORD:-langgraph}"
+PG_SSLMODE="${PG_SSLMODE:-disable}"
+PG_QUERY=""
+if [[ -n "$PG_SSLMODE" && "$PG_SSLMODE" != "disable" ]]; then
+  PG_QUERY="?sslmode=${PG_SSLMODE}"
+elif [[ "$PG_SSLMODE" == "disable" ]]; then
+  PG_QUERY="?sslmode=disable"
+fi
 
 apply_secret() {
   local agent_name=$1
@@ -38,7 +45,7 @@ apply_secret() {
     --from-literal=SPOONACULAR_API_KEY="${SPOONACULAR_API_KEY:-}" \
     --from-literal=RAPIDAPI_KEY="${RAPIDAPI_KEY:-}" \
     --from-literal=REDIS_URI="redis://${REDIS_HOST}:6379/${redis_db}" \
-    --from-literal=DATABASE_URI="postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:5432/${pg_db}" \
+    --from-literal=DATABASE_URI="postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:5432/${pg_db}${PG_QUERY}" \
     --from-literal=LANGGRAPH_CLOUD_LICENSE_KEY="${LANGGRAPH_CLOUD_LICENSE_KEY:-}" \
     --dry-run=client -o yaml | kubectl apply -f -
   echo "    ${agent_name}-secrets"

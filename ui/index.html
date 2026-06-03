@@ -40,7 +40,33 @@
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      min-width: 0;
+    }
     .logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+    .thread-id-header {
+      font-size: 10px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: var(--muted);
+      opacity: 0.7;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+      text-align: left;
+      max-width: 14rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .thread-id-header:hover { opacity: 1; color: var(--accent); }
+    .thread-id-header.copied::after {
+      content: " copied";
+      font-family: inherit;
+    }
     .btn {
       border: 1px solid var(--border);
       background: var(--surface);
@@ -271,18 +297,41 @@
       outline: none;
     }
     #message-input:focus { border-color: var(--accent); }
-    .trace-link {
-      text-align: left;
+    .trace-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
       padding: 0 1.25rem 0.5rem;
     }
-    .trace-link a {
+    .trace-meta a {
       font-size: 11px;
       color: var(--muted);
       text-decoration: none;
       transition: color 0.15s;
     }
-    .trace-link a:hover {
+    .trace-meta a:hover {
       color: var(--accent);
+    }
+    .trace-run-id {
+      font-size: 10px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      color: var(--muted);
+      opacity: 0.65;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0;
+    }
+    .trace-run-id:hover {
+      opacity: 1;
+      color: var(--accent);
+    }
+    .trace-run-id.copied::after {
+      content: " copied";
+      font-family: inherit;
+      letter-spacing: 0;
     }
     @media (max-width: 768px) {
       .main { flex-direction: column; }
@@ -297,7 +346,11 @@
 </head>
 <body>
   <header>
-    <div class="logo">🛒 Personal Shopper</div>
+    <div class="header-left">
+      <div class="logo">🛒 Personal Shopper</div>
+      <button type="button" class="thread-id-header" id="thread-id-label" hidden
+        title="LangGraph thread — all messages in this chat share this id"></button>
+    </div>
     <button class="btn" id="new-chat-btn" type="button">New Chat</button>
   </header>
 
@@ -399,7 +452,8 @@
       'budget_agent', 'finish_node'
     ];
 
-    let threadId = crypto.randomUUID();
+    const THREAD_STORAGE_KEY = 'personal-shopper-thread-id';
+    let threadId = '';
     let activeRetailer = 'kroger';
     let activeDiet = 'none';
     let sending = false;
@@ -409,6 +463,47 @@
     const inputEl = document.getElementById('message-input');
     const stepsBar = document.getElementById('steps-bar');
     const badgesEl = document.getElementById('active-badges');
+    const threadLabelEl = document.getElementById('thread-id-label');
+
+    function formatShortId(id) {
+      if (!id) return '';
+      return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+    }
+
+    function updateThreadLabel() {
+      if (!threadId) {
+        threadLabelEl.hidden = true;
+        return;
+      }
+      const short = formatShortId(threadId);
+      threadLabelEl.hidden = false;
+      threadLabelEl.textContent = `thread ${short}`;
+      threadLabelEl.title = `LangGraph thread (click to copy)\n${threadId}\nAll messages in this chat use this thread.`;
+    }
+
+    async function copyText(text, el) {
+      try {
+        await navigator.clipboard.writeText(text);
+        el.classList.add('copied');
+        setTimeout(() => el.classList.remove('copied'), 1200);
+      } catch (_) { /* ignore */ }
+    }
+
+    threadLabelEl.addEventListener('click', () => {
+      if (threadId) copyText(threadId, threadLabelEl);
+    });
+
+    async function startChatSession() {
+      const res = await fetch('/session', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Could not start chat session');
+      }
+      const data = await res.json();
+      threadId = data.thread_id;
+      sessionStorage.setItem(THREAD_STORAGE_KEY, threadId);
+      updateThreadLabel();
+    }
 
     function getSidebarZip() {
       const raw = document.getElementById('zip-code').value.trim().replace(/\D/g, '');
@@ -524,6 +619,14 @@
 
     async function sendMessage(displayText, apiText) {
       if (sending || !displayText.trim()) return;
+      if (!threadId) {
+        try {
+          await startChatSession();
+        } catch (e) {
+          appendBubble(String(e.message || e), 'error');
+          return;
+        }
+      }
       sending = true;
       document.getElementById('send-btn').disabled = true;
 
@@ -554,6 +657,11 @@
         if (!res.ok) {
           appendBubble(data.detail || 'Request failed', 'error');
         } else {
+          if (data.thread_id) {
+            threadId = data.thread_id;
+            sessionStorage.setItem(THREAD_STORAGE_KEY, threadId);
+            updateThreadLabel();
+          }
           appendBubble(data.reply, 'agent');
           updateSteps(data.agent_steps || []);
           if (data.constraint_violations && data.constraint_violations.length) {
@@ -573,14 +681,38 @@
             meta.textContent = `Refined over ${data.iteration} iterations`;
             messagesEl.appendChild(meta);
           }
-          if (data.langsmith_url) {
-            const traceLink = document.createElement('div');
-            traceLink.className = 'trace-link';
-            traceLink.innerHTML = `
-              <a href="${data.langsmith_url}" target="_blank" rel="noopener">
-                View trace in LangSmith ↗
-              </a>`;
-            messagesEl.appendChild(traceLink);
+          if (data.langsmith_url || data.run_id) {
+            const traceMeta = document.createElement('div');
+            traceMeta.className = 'trace-meta';
+            if (data.langsmith_url) {
+              const a = document.createElement('a');
+              a.href = data.langsmith_url;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.textContent = 'View trace in LangSmith ↗';
+              traceMeta.appendChild(a);
+            }
+            if (data.run_id) {
+              const id = data.run_id;
+              const short =
+                id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id;
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'trace-run-id';
+              btn.textContent = `run ${short}`;
+              btn.title = `LangSmith run ID (click to copy)\n${id}`;
+              btn.addEventListener('click', async () => {
+                try {
+                  await navigator.clipboard.writeText(id);
+                  btn.classList.add('copied');
+                  setTimeout(() => btn.classList.remove('copied'), 1200);
+                } catch (_) {
+                  /* ignore */
+                }
+              });
+              traceMeta.appendChild(btn);
+            }
+            messagesEl.appendChild(traceMeta);
           }
           scrollBottom();
         }
@@ -615,8 +747,13 @@
 
     const WELCOME_HTML = document.getElementById('welcome').innerHTML;
 
-    document.getElementById('new-chat-btn').addEventListener('click', () => {
-      threadId = crypto.randomUUID();
+    document.getElementById('new-chat-btn').addEventListener('click', async () => {
+      try {
+        await startChatSession();
+      } catch (e) {
+        appendBubble(String(e.message || e), 'error');
+        return;
+      }
       messagesEl.innerHTML = '';
       const w = document.createElement('div');
       w.className = 'welcome';
@@ -669,6 +806,20 @@
 
     resetSteps();
     updateActiveBadges();
+
+    (async () => {
+      const saved = sessionStorage.getItem(THREAD_STORAGE_KEY);
+      if (saved) {
+        threadId = saved;
+        updateThreadLabel();
+      } else {
+        try {
+          await startChatSession();
+        } catch (_) {
+          /* LangGraph may not be up yet; first send will create the thread */
+        }
+      }
+    })();
   </script>
 </body>
 </html>

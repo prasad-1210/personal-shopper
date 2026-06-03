@@ -4,7 +4,8 @@ configMap:
     LOG_FORMAT: json
     ORG_NAME: personal-shopper-org
     ENVIRONMENT: dev
-    LANGGRAPH_CHECKPOINTER: postgres
+    # LANGGRAPH_CHECKPOINTER: wolfi API expects JSON, not a plain string.
+    # Postgres/redis checkpointer is configured via DATABASE_URI / REDIS_URI in secrets.
     ENABLE_DISTRIBUTED_TRACING: "true"
     ENABLE_HUMAN_IN_THE_LOOP: "false"
     ENABLE_MULTI_RETAILER: "true"

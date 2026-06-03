@@ -2,19 +2,19 @@ agent:
   name: ui
   graphId: ""
   type: ui
-  port: 22005
+  port: 8080            # K8s local stack (local-k8s-setup); dev process uses 22005
 
 image:
-  repository: ghcr.io/<YOUR_ORG>/personal-shopper-ui
-  tag: latest
-  pullPolicy: Always
+  repository: personal-shopper-ui
+  tag: local
+  pullPolicy: Never
 
 secretName: ui-secrets
 
 replicaCount: 1
 
 langsmith:
-  project: personal-shopper-ui-dev
+  project: personal-shopper-ui-local
 
 redis:
   enabled: false
@@ -23,7 +23,7 @@ postgres:
   enabled: false
 
 interAgent:
-  supervisorUrl: http://supervisor:8000
+  supervisorUrl: ""     # set at deploy: http://supervisor.<namespace>.svc.cluster.local:8000
 
 ingress:
   enabled: true
@@ -31,7 +31,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
   hosts:
-    - host: localhost
+    - host: personal-shopper.local
       paths:
         - path: /
           pathType: Prefix
@@ -43,3 +43,8 @@ resources:
   limits:
     cpu: 500m
     memory: 256Mi
+
+uiHealthProbe:
+  path: /health
+  initialDelaySeconds: 10
+  periodSeconds: 15

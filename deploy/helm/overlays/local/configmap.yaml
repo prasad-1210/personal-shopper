@@ -2,3 +2,6 @@ configMap:
   data:
     ENVIRONMENT: local
     LOG_LEVEL: DEBUG
+    USE_MOCK_TOOLS: "false"
+    RECIPE_PROVIDER: edamam
+    ENABLE_DISTRIBUTED_TRACING: "true"

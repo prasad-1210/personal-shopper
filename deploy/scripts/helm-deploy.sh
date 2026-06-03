@@ -19,24 +19,46 @@ if [[ ! -d "$AGENT_DIR" ]]; then
   exit 1
 fi
 
-if [[ "$ENV" == "local" && -z "${IMAGE_REPOSITORY:-}" ]]; then
-  case "$AGENT" in
-    supervisor) IMAGE_REPOSITORY=personal-shopper-supervisor ;;
-    nutrition-agent) IMAGE_REPOSITORY=personal-shopper-nutrition ;;
-    recipe-agent) IMAGE_REPOSITORY=personal-shopper-recipe ;;
-    shopping-agent) IMAGE_REPOSITORY=personal-shopper-shopping ;;
-    budget-agent) IMAGE_REPOSITORY=personal-shopper-budget ;;
-    ui) IMAGE_REPOSITORY=personal-shopper-ui ;;
-  esac
-  export IMAGE_REPOSITORY
+if [[ "$ENV" == "local" ]]; then
+  if [[ -z "${IMAGE_REPOSITORY:-}" ]]; then
+    case "$AGENT" in
+      supervisor) IMAGE_REPOSITORY=personal-shopper-supervisor ;;
+      nutrition-agent) IMAGE_REPOSITORY=personal-shopper-nutrition ;;
+      recipe-agent) IMAGE_REPOSITORY=personal-shopper-recipe ;;
+      shopping-agent) IMAGE_REPOSITORY=personal-shopper-shopping ;;
+      budget-agent) IMAGE_REPOSITORY=personal-shopper-budget ;;
+      ui) IMAGE_REPOSITORY=personal-shopper-ui ;;
+    esac
+    export IMAGE_REPOSITORY
+  fi
+  IMAGE_TAG="${IMAGE_TAG:-local}"
+  export IMAGE_TAG
+  EXTRA_SET=(--set "image.pullPolicy=Never")
+else
+  EXTRA_SET=()
 fi
 
-EXTRA_SET=()
 if [[ -n "${IMAGE_TAG:-}" ]]; then
   EXTRA_SET+=(--set "image.tag=${IMAGE_TAG}")
 fi
 if [[ -n "${IMAGE_REPOSITORY:-}" ]]; then
   EXTRA_SET+=(--set "image.repository=${IMAGE_REPOSITORY}")
+fi
+
+# Supervisor inter-agent URLs for in-cluster DNS (local K8s namespaces)
+if [[ "$AGENT" == "supervisor" && "$NAMESPACE" != "agents-dev" ]]; then
+  EXTRA_SET+=(
+    --set "interAgent.nutritionAgentUrl=http://nutrition-agent.${NAMESPACE}.svc.cluster.local:8000"
+    --set "interAgent.recipeAgentUrl=http://recipe-agent.${NAMESPACE}.svc.cluster.local:8000"
+    --set "interAgent.shoppingAgentUrl=http://shopping-agent.${NAMESPACE}.svc.cluster.local:8000"
+    --set "interAgent.budgetAgentUrl=http://budget-agent.${NAMESPACE}.svc.cluster.local:8000"
+  )
+fi
+if [[ "$AGENT" == "ui" && "$NAMESPACE" != "agents-dev" ]]; then
+  EXTRA_SET+=(
+    --set "agent.port=8080"
+    --set "interAgent.supervisorUrl=http://supervisor.${NAMESPACE}.svc.cluster.local:8000"
+  )
 fi
 
 echo "Deploying ${AGENT} → namespace ${NAMESPACE} (env overlay: ${ENV})"
@@ -50,7 +72,7 @@ helm upgrade --install "${AGENT}" "${CHART_DIR}" \
   -f "deploy/helm/overlays/${ENV}/configmap.yaml" \
   -f "${AGENT_DIR}/configmap.yaml" \
   "${EXTRA_SET[@]}" \
-  --wait --timeout 120s
+  --wait --timeout 300s
 
 echo "✅ ${AGENT} deployed"
 kubectl get pods -n "${NAMESPACE}" -l "app.kubernetes.io/name=${AGENT}" 2>/dev/null || true

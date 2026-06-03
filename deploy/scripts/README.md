@@ -4,6 +4,26 @@ Bash helpers for local Kubernetes setup and layered Helm installs. Run from the 
 
 ## Scripts
 
+### `local-k8s-setup.sh`
+
+Full stack on **Docker Desktop Kubernetes** (`agents-local`):
+
+1. Redis + PostgreSQL (Bitnami)
+2. Per-agent Postgres databases
+3. `langgraph build` wolfi images tagged `:local`
+4. UI image `personal-shopper-ui:local`
+5. nginx ingress controller
+6. Per-agent secrets + layered Helm deploy
+7. Port-forwards `:8000`–`:8080`
+
+```bash
+bash deploy/scripts/local-k8s-setup.sh
+```
+
+### `local-k8s-teardown.sh` / `local-k8s-status.sh`
+
+Remove the `agents-local` namespace stack or print pod/health status.
+
 ### `local-setup.sh`
 
 **One-time** Docker Desktop Kubernetes bootstrap.

@@ -33,7 +33,15 @@ For **Docker Desktop Kubernetes** (Path 3 in the root README), enable Kubernetes
 
 ## Quick start (local cluster)
 
-One command installs ingress, Redis, PostgreSQL, builds images, creates secrets, and deploys all agents:
+**Docker Desktop Kubernetes (recommended):**
+
+```bash
+bash deploy/scripts/local-k8s-setup.sh   # namespace agents-local, images :local
+bash deploy/scripts/local-k8s-status.sh
+bash deploy/scripts/local-k8s-teardown.sh
+```
+
+**Legacy one-shot (namespace `agents-dev`):**
 
 ```bash
 bash deploy/scripts/local-setup.sh
