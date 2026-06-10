@@ -54,7 +54,7 @@ build_one() {
     --pull \
     -t "${image}"
   if [[ "$PUSH" == "true" ]]; then
-    docker push "${image}"
+    bash "${ROOT}/scripts/docker-push-retry.sh" push "${image}"
   fi
   echo "${image}"
 }

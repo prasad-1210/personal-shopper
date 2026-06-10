@@ -20,6 +20,7 @@ from tests.eval.evaluators import (
     judge_recipe_relevance,
     mean_evaluator_score,
 )
+from tests.eval.preflight import skip_if_no_openai
 
 
 def run_recipe_search(inputs: dict) -> dict:
@@ -71,6 +72,7 @@ def main():
     parser.add_argument("--ci", action="store_true")
     parser.add_argument("--experiment-prefix", default="recipe-eval")
     args = parser.parse_args()
+    skip_if_no_openai(ci=args.ci)
 
     client = Client()
     datasets = list(client.list_datasets(dataset_name="recipe-relevance-v1"))

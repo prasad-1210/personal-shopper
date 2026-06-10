@@ -16,6 +16,7 @@ os.environ.setdefault("USE_MOCK_TOOLS", "true")
 from langsmith import Client, evaluate
 
 from tests.eval.evaluators import judge_substitution, mean_evaluator_score
+from tests.eval.preflight import skip_if_no_openai
 
 
 def run_substitution(inputs: dict) -> dict:
@@ -67,6 +68,7 @@ def main():
     parser.add_argument("--ci", action="store_true")
     parser.add_argument("--experiment-prefix", default="sub-eval")
     args = parser.parse_args()
+    skip_if_no_openai(ci=args.ci)
 
     client = Client()
     datasets = list(client.list_datasets(dataset_name="substitution-quality-v1"))

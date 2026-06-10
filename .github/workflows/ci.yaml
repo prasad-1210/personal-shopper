@@ -105,27 +105,21 @@ jobs:
       - name: Build all agent images (langgraph build / wolfi)
         run: bash scripts/build-agent-images.sh --tag ci
 
-      - name: Verify supervisor image imports graph
+      - name: Verify agent images load graphs
         run: |
-          docker run --rm personal-shopper-supervisor:ci \
-            python -c "
-          import os
-          os.environ.setdefault('OPENAI_API_KEY', 'sk-test-fake')
-          os.environ.setdefault('LANGSMITH_TRACING', 'false')
-          from supervisor.graph import graph
-          print('supervisor graph import in image OK')
-          " || echo "Note: import check skipped if runtime env not available in image"
-
-      - name: Verify nutrition image imports graph
-        run: |
-          docker run --rm personal-shopper-nutrition:ci \
-            python -c "
-          import os
-          os.environ.setdefault('OPENAI_API_KEY', 'sk-test-fake')
-          os.environ.setdefault('LANGSMITH_TRACING', 'false')
-          from agents.nutrition_agent.graph import graph
-          print('nutrition graph import in image OK')
-          " || echo "Note: import check skipped if runtime env not available in image"
+          # Wolfi images register graphs via LANGSERVE_GRAPHS (/deps/... paths), not package imports.
+          pip install -q pyyaml
+          mapfile -t ids < <(python3 scripts/langgraph-agents.py ids)
+          for id in "${ids[@]}"; do
+            echo "==> verify personal-shopper-${id}:ci"
+            docker run --rm \
+              --entrypoint python \
+              -v "${PWD}/scripts/verify-image-graph.py:/verify.py:ro" \
+              -e OPENAI_API_KEY=sk-test-fake \
+              -e LANGSMITH_TRACING=false \
+              "personal-shopper-${id}:ci" \
+              /verify.py
+          done
 
   build-ui-image:
     name: Build UI Image

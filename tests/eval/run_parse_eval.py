@@ -17,16 +17,14 @@ os.environ.setdefault("USE_MOCK_TOOLS", "true")
 from langchain_core.messages import HumanMessage
 from langsmith import Client, evaluate
 
+from shared.state import AgentState
+from supervisor.graph import parse_request
 from tests.eval.evaluators import check_parse_schema, mean_evaluator_score
+from tests.eval.preflight import skip_if_no_openai
 
 
 def run_agent(inputs: dict) -> dict:
     """Run parse_request node only (no sub-agents required)."""
-    os.environ.setdefault("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", ""))
-
-    from shared.state import AgentState
-    from supervisor.graph import parse_request
-
     utterance = inputs.get("utterance", "")
 
     state: AgentState = {  # type: ignore[typeddict-item]
@@ -57,6 +55,7 @@ def main():
     parser.add_argument("--ci", action="store_true", help="Exit 1 if score below threshold")
     parser.add_argument("--experiment-prefix", default="parse-eval")
     args = parser.parse_args()
+    skip_if_no_openai(ci=args.ci)
 
     client = Client()
     datasets = list(client.list_datasets(dataset_name="request-parsing-v1"))

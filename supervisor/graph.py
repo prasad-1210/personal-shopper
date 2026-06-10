@@ -22,7 +22,15 @@ from langgraph.pregel.remote import RemoteGraph
 from shared.prompt_loader import chat_prompt
 from shared.state import AgentState, ShoppingRequest
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+_LLM: ChatOpenAI | None = None
+
+
+def _get_llm() -> ChatOpenAI:
+    """Lazy-init LLM so graph module imports without OPENAI_API_KEY (tests, eval loaders)."""
+    global _LLM
+    if _LLM is None:
+        _LLM = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    return _LLM
 
 NUTRITION_AGENT_URL = os.environ.get("NUTRITION_AGENT_URL", "http://127.0.0.1:22001")
 RECIPE_AGENT_URL = os.environ.get("RECIPE_AGENT_URL", "http://127.0.0.1:22002")
@@ -294,7 +302,7 @@ def parse_request(state: AgentState) -> dict:
     ui_defaults, body = _split_ui_prefix_and_body(last_content)
     parse_text = body or last_content
 
-    structured_llm = llm.with_structured_output(ShoppingRequest)
+    structured_llm = _get_llm().with_structured_output(ShoppingRequest)
     result = (chat_prompt("parse_request") | structured_llm).invoke({"message": parse_text})
     if isinstance(result, dict):
         result["raw_message"] = last_content

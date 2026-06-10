@@ -184,9 +184,9 @@ Direct integrators may pass the same `config` fields for trace correlation.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Supervisor, Nutrition | LLM calls |
-| `LANGSMITH_API_KEY` | Recommended | Tracing |
+| `LANGSMITH_API_KEY` | Recommended | Tracing — workspace-scoped service key (`team-sandbox` / `team-nonprod` / `team-prod`) |
 | `LANGSMITH_TRACING` | Optional | `true` / `false` |
-| `LANGSMITH_PROJECT` | Optional | Trace project name |
+| `LANGSMITH_PROJECT` | Optional | Trace project name within the workspace |
 | `USE_MOCK_TOOLS` | Optional | `true` skips live APIs |
 | `REDIS_URI` | Production | Checkpoint backend |
 | `DATABASE_URI` | Production | Checkpoint backend |

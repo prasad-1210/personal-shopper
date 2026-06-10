@@ -15,7 +15,14 @@ from shared.distributed_tracing import export_traced_graph
 from shared.prompt_loader import chat_prompt
 from shared.state import AgentState
 
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+_LLM: ChatOpenAI | None = None
+
+
+def _get_llm() -> ChatOpenAI:
+    global _LLM
+    if _LLM is None:
+        _LLM = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    return _LLM
 
 
 def interpret_constraints(state: AgentState) -> dict:
@@ -48,7 +55,7 @@ def interpret_constraints(state: AgentState) -> dict:
             "agent_steps": steps,
         }
 
-    result = (chat_prompt("nutrition_constraints") | llm).invoke({
+    result = (chat_prompt("nutrition_constraints") | _get_llm()).invoke({
         "profile": profile or "none",
         "calories": str(max_cal) if max_cal else "not specified",
     })

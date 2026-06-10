@@ -218,6 +218,20 @@ All agents share `AgentState` (TypedDict). Key fields:
 
 ## LangSmith tracing
 
+### Workspace strategy (org standard)
+
+Three LangSmith **workspaces** isolate traces by trust boundary. **Projects** (`LANGSMITH_PROJECT`) group runs per agent within a workspace.
+
+| Workspace | Sources |
+|-----------|---------|
+| `team-sandbox` | Local dev, CI eval experiments |
+| `team-nonprod` | K8s dev / staging agent servers |
+| `team-prod` | Production agent servers |
+
+Workspace is selected by **API key scope** (or `X-Tenant-Id`), not by `LANGSMITH_PROJECT`. CI pipelines **export/import datasets and prompts** between workspaces ([langsmith-migrator](https://github.com/langchain-ai/langsmith-data-migration-tool)); traces are not promoted.
+
+Full rationale, RBAC, and pipeline shape: [DEVELOPER-GUIDE.md §7.14](DEVELOPER-GUIDE.md#714-workspace-strategy-org-standard).
+
 ### Distributed tracing (multi-agent)
 
 | Piece | File | Pattern |
@@ -326,6 +340,7 @@ See [shared/prompts/README.md](../shared/prompts/README.md) for naming conventio
 
 | Doc | Audience |
 |-----|----------|
+| [docs/DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) | Org-wide agentic dev guide (Personal Shopper = reference impl) |
 | [docs/agents/README.md](agents/README.md) | External integrators — HTTP API index |
 | [docs/agents/API-CONTRACT.md](agents/API-CONTRACT.md) | Shared ``AgentState``, endpoints, auth |
 | [docs/agents/*.md](agents/) | Per-agent integration specs (Swagger-style) |

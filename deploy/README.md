@@ -119,6 +119,8 @@ Wolfi agent images require **full connection strings** in Kubernetes secrets (no
 - `DATABASE_URI` — unique Postgres database per agent
 - `LANGSMITH_API_KEY`, `OPENAI_API_KEY`, plus retailer keys as needed
 
+**LangSmith workspaces:** Use a **workspace-scoped service key** per environment tier — `team-nonprod` for dev/staging overlays, `team-prod` for prod. Local and CI use `team-sandbox`. The key selects the workspace; `langsmith.project` in Helm selects the tracing project per agent. See [DEVELOPER-GUIDE.md §7.14](../docs/DEVELOPER-GUIDE.md#714-workspace-strategy-org-standard).
+
 Each release uses `secretName: <agent-name>-secrets` (e.g. `recipe-agent-secrets`). See [helm/LAYERS.md](helm/LAYERS.md#langgraph-wolfi-image-constraints) for the full key list.
 
 ```bash

@@ -10,15 +10,48 @@ env:
   UI_IMAGE: ghcr.io/${{ github.repository }}/personal-shopper-ui
 
 jobs:
-  build-and-push:
-    name: Build and push images
+  matrix-prep:
+    name: Resolve agent matrix
     runs-on: ubuntu-latest
+    outputs:
+      agents: ${{ steps.set.outputs.agents }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install pyyaml
+
+      - id: set
+        run: |
+          AGENTS=$(python3 -c "
+          import json, subprocess
+          ids = subprocess.check_output(
+              ['python3', 'scripts/langgraph-agents.py', 'ids'], text=True
+          ).split()
+          print(json.dumps(ids))
+          ")
+          echo "agents=${AGENTS}" >> "$GITHUB_OUTPUT"
+
+  build-push-agent:
+    name: Agent — ${{ matrix.agent }}
+    runs-on: ubuntu-latest
+    needs: matrix-prep
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        agent: ${{ fromJson(needs.matrix-prep.outputs.agents) }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -34,40 +67,52 @@ jobs:
       - name: Install langgraph-cli
         run: pip install "langgraph-cli>=0.2.11" pyyaml
 
-      - name: Build LangGraph agent images (wolfi via langgraph build)
+      - name: Build and push ${{ matrix.agent }} image
         env:
           IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
         run: |
-          # langgraph build uses image_distro from each langgraph.json (wolfi base).
-          # scripts/build-agent-images.sh passes --platform linux/amd64 --pull.
-          bash scripts/build-agent-images.sh --tag "${{ github.sha }}"
+          bash scripts/build-agent-images.sh \
+            --tag "${{ github.sha }}" \
+            --only "${{ matrix.agent }}" \
+            --push
+          SHA_TAG="${IMAGE_PREFIX}-${{ matrix.agent }}:${{ github.sha }}"
+          DEV_TAG="${IMAGE_PREFIX}-${{ matrix.agent }}:dev"
+          bash scripts/docker-push-retry.sh tag-remote "${SHA_TAG}" "${DEV_TAG}"
 
-      - name: Tag and push agent images
-        env:
-          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-        run: |
-          pip install pyyaml
-          mapfile -t ids < <(python3 scripts/langgraph-agents.py ids)
-          for id in "${ids[@]}"; do
-            docker tag "${IMAGE_PREFIX}-${id}:${{ github.sha }}" "${IMAGE_PREFIX}-${id}:dev"
-            docker push "${IMAGE_PREFIX}-${id}:${{ github.sha }}"
-            docker push "${IMAGE_PREFIX}-${id}:dev"
-          done
+  build-push-ui:
+    name: UI image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
-      - name: Build and push UI image
-        uses: docker/build-push-action@v5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          context: .
-          file: Dockerfile.ui
-          push: true
-          tags: |
-            ${{ env.UI_IMAGE }}:${{ github.sha }}
-            ${{ env.UI_IMAGE }}:dev
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build UI image
+        run: docker build -f Dockerfile.ui -t "${{ env.UI_IMAGE }}:${{ github.sha }}" .
+
+      - name: Push UI image
+        run: |
+          bash scripts/docker-push-retry.sh push "${{ env.UI_IMAGE }}:${{ github.sha }}"
+          bash scripts/docker-push-retry.sh tag-remote \
+            "${{ env.UI_IMAGE }}:${{ github.sha }}" \
+            "${{ env.UI_IMAGE }}:dev"
 
   helm-validate:
     name: Helm validate (post-build)
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: [build-push-agent, build-push-ui]
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
@@ -95,7 +140,7 @@ jobs:
   deploy-instructions:
     name: Deployment instructions
     runs-on: ubuntu-latest
-    needs: [build-and-push, helm-validate]
+    needs: [build-push-agent, build-push-ui, helm-validate]
     steps:
       - uses: actions/checkout@v4
       - name: Print deploy command
