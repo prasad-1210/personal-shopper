@@ -1,7 +1,10 @@
 """
 Shopping Agent — checks store availability and resolves substitutions.
-Deployed as a standalone LangGraph server on port 22003 (local dev).
+
+No LLM; calls recipe + retailer APIs per ingredient. Port 22003 local dev.
 Called by supervisor via RemoteGraph.
+
+Integration spec: docs/agents/shopping-agent.md
 """
 import os
 
@@ -9,6 +12,7 @@ from langgraph.graph import END, START, StateGraph
 
 from shared.distributed_tracing import export_traced_graph
 from shared.state import AgentState, IngredientAvailability
+from shared.tool_tracing import invoke_tool
 
 USE_MOCK = os.environ.get("USE_MOCK_TOOLS", "false").lower() == "true"
 RECIPE_PROVIDER = os.environ.get("RECIPE_PROVIDER", "edamam")
@@ -52,6 +56,7 @@ else:
 
 
 def _get_retailer(state: AgentState) -> str:
+    """Normalise ``request.preferred_retailer`` to Kroger or a RapidAPI store key."""
     req = state.get("request") or {}
     retailer = req.get("preferred_retailer", "kroger") if isinstance(req, dict) \
         else getattr(req, "preferred_retailer", "kroger")
@@ -64,7 +69,16 @@ def _get_retailer(state: AgentState) -> str:
 
 
 def check_availability(state: AgentState) -> dict:
-    """Extract ingredients, check availability, resolve substitutions."""
+    """Expand recipes to ingredients, check store stock, resolve substitutes.
+
+    Args:
+        state: Requires ``selected_recipes``, ``request``, and ``location_id``.
+            Excludes ``request.pantry_items`` from the list.
+
+    Returns:
+        ``ingredients`` and ``shopping_list`` (identical lists of
+        ``IngredientAvailability``), plus ``agent_steps``.
+    """
     req = state.get("request") or {}
     pantry_items = (
         req.get("pantry_items", []) if isinstance(req, dict)
@@ -72,11 +86,20 @@ def check_availability(state: AgentState) -> dict:
     )
     pantry = {p.lower().strip() for p in pantry_items}
 
+    provider = "mock" if USE_MOCK else RECIPE_PROVIDER
     seen: set[str] = set()
     all_ingredients: list[IngredientAvailability] = []
 
     for recipe in state.get("selected_recipes", []):
-        data = get_recipe_ingredients.invoke({"recipe_id": recipe["id"]})
+        recipe_id = recipe["id"]
+        data = invoke_tool(
+            get_recipe_ingredients,
+            {"recipe_id": recipe_id},
+            provider=provider,
+            label=f"{provider}.get_recipe_ingredients:{recipe_id}",
+            tags=["shopping_agent"],
+            metadata={"recipe_id": recipe_id, "recipe_title": recipe.get("title", "")},
+        )
         for ing in data.get("ingredients", []):
             key = ing["name"].lower().strip()
             if key in seen or key in pantry:
@@ -94,18 +117,37 @@ def check_availability(state: AgentState) -> dict:
     uses_rapid = retailer in RAPIDAPI_RETAILERS
     updated: list[IngredientAvailability] = []
 
+    check_provider = "mock" if USE_MOCK else ("rapidapi" if uses_rapid else "kroger")
     for ing in all_ingredients:
         if uses_rapid:
-            result = rapidapi_check.invoke({
-                "ingredient": ing.name,
-                "location_id": location_id,
-                "store": retailer,
-            })
+            result = invoke_tool(
+                rapidapi_check,
+                {
+                    "ingredient": ing.name,
+                    "location_id": location_id,
+                    "store": retailer,
+                },
+                provider=check_provider,
+                label=f"{check_provider}.check_product_availability:{ing.name}@{retailer}",
+                tags=["shopping_agent", retailer],
+                metadata={
+                    "ingredient": ing.name,
+                    "retailer": retailer,
+                    "location_id": location_id,
+                },
+            )
         else:
-            result = kroger_check.invoke({
-                "ingredient": ing.name,
-                "location_id": location_id,
-            })
+            result = invoke_tool(
+                kroger_check,
+                {
+                    "ingredient": ing.name,
+                    "location_id": location_id,
+                },
+                provider=check_provider,
+                label=f"{check_provider}.check_product_availability:{ing.name}",
+                tags=["shopping_agent", "kroger"],
+                metadata={"ingredient": ing.name, "location_id": location_id},
+            )
         updated.append(ing.model_copy(update={
             "available": result.get("available", False),
             "product_description": result.get("product_description"),
@@ -117,7 +159,14 @@ def check_availability(state: AgentState) -> dict:
         if ing.available:
             final.append(ing)
             continue
-        subs = get_ingredient_substitutes.invoke({"ingredient_name": ing.name})
+        subs = invoke_tool(
+            get_ingredient_substitutes,
+            {"ingredient_name": ing.name},
+            provider=provider,
+            label=f"{provider}.get_ingredient_substitutes:{ing.name}",
+            tags=["shopping_agent"],
+            metadata={"ingredient": ing.name},
+        )
         chosen = (subs.get("substitutes") or ["Ask store staff"])[0]
         final.append(ing.model_copy(update={"substitute": chosen}))
 
@@ -131,6 +180,7 @@ def check_availability(state: AgentState) -> dict:
 
 
 def build_graph():
+    """Compile the single-node shopping availability graph."""
     builder = StateGraph(AgentState)
     builder.add_node("check_availability", check_availability)
     builder.add_edge(START, "check_availability")

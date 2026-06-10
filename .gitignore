@@ -118,6 +118,12 @@ __pypackages__/
 celerybeat-schedule
 celerybeat.pid
 
+# Local dev runtime artifacts
+logs/*.pid
+logs/*.log
+.kroger_token*
+**/.kroger_token*
+
 # SageMath parsed files
 *.sage.py
 
@@ -163,3 +169,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .langgraph_api/
+
+# kroger tokens
+.kroger_token*
+*/.kroger_token_client_product.compact.json
+agents/shopping_agent/.kroger_token_client_product.compact.json

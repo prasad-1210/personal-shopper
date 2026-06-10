@@ -1,8 +1,8 @@
-# Mock tools implement the same interface as:
-#   kroger.py              — find_nearest_store, check_product_availability
-#   rapidapi_search.py     — find_nearest_store, check_product_availability
-# Both tools have identical signatures so mocks work for all retailers.
-# Mock tools implement the same interface as both spoonacular.py and edamam.py
+"""Deterministic mock tools for CI and local dev without API keys.
+
+Implements the same ``@tool`` signatures as kroger, rapidapi_search, edamam,
+and spoonacular. Enable with ``USE_MOCK_TOOLS=true``.
+"""
 from typing import Any
 
 from langchain_core.tools import tool
@@ -143,10 +143,31 @@ def check_product_availability(ingredient: str, location_id: str) -> dict[str, A
 
 @tool
 def search_recipes(
-    query: str, diet: str = "", max_ready_time: int = 60, number: int = 3
+    query: str,
+    diet: str = "",
+    max_ready_time: int = 60,
+    number: int = 3,
+    exclude_ingredients: list[str] | None = None,
+    max_calories: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Search for recipes matching a query."""
-    return MOCK_RECIPES[:number]
+    """Search for recipes matching a query (mock).
+
+    Applies ``exclude_ingredients`` by filtering mock recipes whose ingredient
+    names intersect the exclusion list. ``max_calories`` is accepted for API parity.
+    """
+    _ = max_calories
+    results = list(MOCK_RECIPES[:number])
+    if exclude_ingredients:
+        exclude_set = {e.lower() for e in exclude_ingredients}
+        filtered = []
+        for recipe in results:
+            ingredients = MOCK_INGREDIENTS.get(recipe["id"], {}).get("ingredients", [])
+            ingredient_names = {i["name"].lower() for i in ingredients}
+            if not ingredient_names.intersection(exclude_set):
+                filtered.append(recipe)
+        if filtered:
+            results = filtered
+    return results
 
 
 @tool

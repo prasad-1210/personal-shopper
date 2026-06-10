@@ -3,6 +3,12 @@
 LangGraph agent + FastAPI UI. Recipes via Edamam. 
 Live store inventory via Kroger API. Traces to LangSmith Cloud.
 
+**Architecture (agents, graphs, design decisions):** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — keep this updated when you change the system.
+
+**Agent integration specs (external HTTP API):** [docs/agents/README.md](docs/agents/README.md) · [API contract](docs/agents/API-CONTRACT.md) · [Tools](docs/TOOLS.md)
+
+**Full system inventory (files, functions, integration, env):** [docs/SYSTEM-INVENTORY.md](docs/SYSTEM-INVENTORY.md)
+
 ---
 
 ## Prerequisites
@@ -22,15 +28,16 @@ Enable Kubernetes in Docker Desktop:
 ## Path 1 — Local dev (fastest, no Docker)
 
 ```bash
-# Terminal 1 — agent
 cp .env.example .env   # fill in API keys
-pip install -e .
-langgraph dev           # runs on port 2024
-                        # LangGraph Studio: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:2024
+pip install -e ".[dev]"
+
+# Terminal 1 — all agents (supervisor :22000, sub-agents :22001–:22004)
+bash scripts/dev-multiagent.sh
+# Studio: https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:22000
 
 # Terminal 2 — UI
 cd ui && cp .env.example .env
-# set LANGGRAPH_URL=http://127.0.0.1:2024
+# set LANGGRAPH_URL=http://127.0.0.1:22000
 pip install -r requirements.txt
 python server.py        # runs on port 22005
 ```
@@ -58,13 +65,11 @@ Spins up Redis + PostgreSQL automatically alongside the agent and UI.
 ## Path 3 — Docker Desktop Kubernetes (mirrors AKS)
 
 ```bash
-# One-time setup
-bash deploy/scripts/local-setup.sh
+# One-time setup (namespace agents-local)
+bash deploy/scripts/local-k8s-setup.sh
+bash deploy/scripts/local-k8s-status.sh
 
-# Open http://localhost
-
-# Port-forward if ingress not working
-kubectl port-forward svc/ui 22005:22005 -n agents-dev
+# Open http://localhost:8080 (UI port-forward from setup script)
 ```
 
 ---
@@ -111,9 +116,9 @@ Upgrade workflow: change image tag → `helm upgrade` → done.
 ## Deployment progression
 
 ```
-langgraph dev          → local inner loop (port 2024)
+dev-multiagent.sh      → local inner loop (supervisor :22000)
 docker compose         → local production image test (UI port 22005)
-Docker Desktop K8s     → local AKS simulation
+Docker Desktop K8s     → local AKS simulation (agents-local)
 AKS dev namespace      → shared dev environment (same Helm chart)
 AKS prod namespace     → production (same Helm chart, different values)
 ```

@@ -1,14 +1,17 @@
 """
 Supervisor — orchestrates sub-agents via RemoteGraph (HTTP).
 
-Local dev: sub-agents on ports 22001–22004, supervisor on 22000.
-Docker Compose: http://nutrition-agent:8000, etc.
+Entry graph for the Personal Shopper product. Parses user messages, finds a
+store, and routes deterministically to nutrition, recipe, shopping, and budget
+sub-agents until a markdown shopping list is produced.
+
+Local dev: supervisor :22000, sub-agents :22001–:22004.
+Integration spec: docs/agents/supervisor.md
 """
 import os
 import re
 
 from langchain_core.messages import AIMessage, HumanMessage
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph._internal._config import merge_configs
@@ -16,6 +19,7 @@ from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.pregel.remote import RemoteGraph
 
+from shared.prompt_loader import chat_prompt
 from shared.state import AgentState, ShoppingRequest
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
@@ -49,7 +53,11 @@ def _remote(name: str, url: str) -> RemoteGraph:
 
 
 def _remote_invoke_config(agent_name: str) -> RunnableConfig:
-    """LangSmith metadata for correlation; checkpoint thread_id stays on supervisor only."""
+    """Build RunnableConfig with LangSmith correlation metadata for RemoteGraph.
+
+    Propagates parent ``thread_id`` and ``run_id`` into sub-agent trace metadata.
+    Checkpoint ``thread_id`` remains on the supervisor process only.
+    """
     try:
         parent = get_config()
     except RuntimeError:
@@ -77,6 +85,7 @@ def _invoke_remote(
     extra_tags: list[str] | None = None,
     extra_metadata: dict | None = None,
 ) -> dict:
+    """Invoke a sub-agent graph over HTTP and return its output state dict."""
     config = _remote_invoke_config(agent_name)
     if extra_tags or extra_metadata:
         patch: RunnableConfig = {}
@@ -89,6 +98,7 @@ def _invoke_remote(
 
 
 def _get_retailer(state: AgentState) -> str:
+    """Return normalised retailer key from ``request.preferred_retailer``."""
     req = state.get("request") or {}
     retailer = req.get("preferred_retailer", "kroger") if isinstance(req, dict) \
         else getattr(req, "preferred_retailer", "kroger")
@@ -101,11 +111,16 @@ def _get_retailer(state: AgentState) -> str:
 
 
 def _uses_rapidapi(retailer: str) -> bool:
+    """Return True if retailer uses RapidAPI catalog (not Kroger inventory)."""
     return retailer in RAPIDAPI_RETAILERS
 
 
 def receive_message(state: AgentState) -> dict:
-    """Reset all per-run state on every new message."""
+    """Reset per-run workflow fields at the start of each user message.
+
+    Clears recipes, ingredients, agent_steps, counters, and errors so a
+    checkpointed thread does not leak state from a prior run.
+    """
     return {
         "iteration": 0,
         "budget_status": "unchecked",
@@ -255,6 +270,11 @@ def _apply_ui_defaults(
 
 
 def parse_request(state: AgentState) -> dict:
+    """Extract ``ShoppingRequest`` from the latest human message via LLM.
+
+    Merges UI sidebar defaults (zip, retailer, diet, budget) when the user
+    message body does not mention those fields. Prompt: ``shared/prompts/parse_request``.
+    """
     messages = state.get("messages", [])
     last_content = None
     for m in reversed(messages):
@@ -275,21 +295,7 @@ def parse_request(state: AgentState) -> dict:
     parse_text = body or last_content
 
     structured_llm = llm.with_structured_output(ShoppingRequest)
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """Extract a structured shopping request from the user's message text only.
-Ignore any separate UI sidebar defaults — extract only what the user explicitly stated.
-
-Extract 1-3 specific meal names into meal_keywords — not individual ingredients.
-For dietary_restrictions: only explicit restrictions the user stated.
-zip_code: 5-digit US zip if mentioned; otherwise '94103'.
-servings: default 4 if not specified.
-budget_usd: dollar amounts → float. Null if absent.
-max_calories_per_serving: calorie limits → float. Null if absent.
-dietary_profile: diabetic, vegan, vegetarian, low-carb, keto, gluten-free, dairy-free, or ''.
-preferred_retailer: walmart, target, costco, amazon, or kroger family → 'kroger'. Default 'kroger'."""),
-        ("human", "{message}"),
-    ])
-    result = (prompt | structured_llm).invoke({"message": parse_text})
+    result = (chat_prompt("parse_request") | structured_llm).invoke({"message": parse_text})
     if isinstance(result, dict):
         result["raw_message"] = last_content
     else:
@@ -315,7 +321,11 @@ preferred_retailer: walmart, target, costco, amazon, or kroger family → 'kroge
 
 
 def find_store(state: AgentState) -> dict:
-    """Find nearest store via Kroger API or RapidAPI placeholder."""
+    """Resolve store ``location_id`` and ``store_name`` for the user's zip.
+
+    Uses Kroger ``find_nearest_store`` for Kroger-family retailers, or RapidAPI
+    placeholder for Walmart/Target/Costco/Amazon. Respects ``USE_MOCK_TOOLS``.
+    """
     zip_code = "94103"
     req = state.get("request")
     if req:
@@ -325,22 +335,42 @@ def find_store(state: AgentState) -> dict:
     retailer = _get_retailer(state)
     use_mock = os.environ.get("USE_MOCK_TOOLS", "false").lower() == "true"
 
+    from shared.tool_tracing import invoke_tool
+
     if retailer == "kroger":
         if use_mock:
             from personal_shopper.tools.mock_tools import find_nearest_store
+            provider = "mock"
         else:
             from personal_shopper.tools.kroger import find_nearest_store
-        result = find_nearest_store.invoke({"zip_code": zip_code})
+            provider = "kroger"
+        result = invoke_tool(
+            find_nearest_store,
+            {"zip_code": zip_code},
+            provider=provider,
+            label=f"{provider}.find_nearest_store:{zip_code}",
+            tags=["find_store", "kroger"],
+            metadata={"zip_code": zip_code, "retailer": "kroger"},
+        )
     else:
         if use_mock:
             from personal_shopper.tools.mock_tools import (
                 find_nearest_store as find_store_fn,
             )
+            provider = "mock"
         else:
             from personal_shopper.tools.rapidapi_search import (
                 find_nearest_store as find_store_fn,
             )
-        result = find_store_fn.invoke({"zip_code": zip_code})
+            provider = "rapidapi"
+        result = invoke_tool(
+            find_store_fn,
+            {"zip_code": zip_code},
+            provider=provider,
+            label=f"{provider}.find_nearest_store:{zip_code}@{retailer}",
+            tags=["find_store", retailer],
+            metadata={"zip_code": zip_code, "retailer": retailer},
+        )
 
     steps = list(state.get("agent_steps", []))
     steps.append("find_store")
@@ -362,7 +392,11 @@ def _req_field(state: AgentState, field: str, default=None):
 
 
 def _decide_next_agent(state: AgentState) -> str:
-    """Deterministic supervisor routing (rules apply in order)."""
+    """Return the next graph node name using ordered deterministic rules.
+
+    Order: nutrition → recipe → shopping → budget → recipe retry → finish.
+    See docs/agents/supervisor.md for the full routing table.
+    """
     profile = _req_field(state, "dietary_profile", "")
     max_cal = _req_field(state, "max_calories_per_serving")
     budget = _req_field(state, "budget_usd")
@@ -412,6 +446,7 @@ def _summarise(state: AgentState) -> str:
 
 
 def supervisor_node(state: AgentState) -> dict:
+    """Increment turn counter and set ``next_agent`` for the conditional router."""
     turns = state.get("iteration", 0)
     if turns >= MAX_SUPERVISOR_TURNS:
         decision = "finish_node"
@@ -428,6 +463,7 @@ def supervisor_node(state: AgentState) -> dict:
 
 
 def supervisor_router(state: AgentState) -> str:
+    """Conditional edge function: route to ``next_agent`` node name."""
     return state.get("next_agent", "finish_node")
 
 
@@ -451,6 +487,7 @@ def _merge_remote_result(state: AgentState, result: dict, step_name: str) -> dic
 
 
 def call_nutrition_agent(state: AgentState) -> dict:
+    """RemoteGraph invoke: nutrition agent. Merges result into supervisor state."""
     try:
         result = _invoke_remote(
             "nutrition_agent",
@@ -471,6 +508,7 @@ def call_nutrition_agent(state: AgentState) -> dict:
 
 
 def call_recipe_agent(state: AgentState) -> dict:
+    """RemoteGraph invoke: recipe agent. Increments ``refinement_count`` on budget retry."""
     try:
         result = _invoke_remote(
             "recipe_agent",
@@ -496,6 +534,7 @@ def call_recipe_agent(state: AgentState) -> dict:
 
 
 def call_shopping_agent(state: AgentState) -> dict:
+    """RemoteGraph invoke: shopping agent. Passes retailer in trace metadata."""
     try:
         result = _invoke_remote(
             "shopping_agent",
@@ -517,6 +556,7 @@ def call_shopping_agent(state: AgentState) -> dict:
 
 
 def call_budget_agent(state: AgentState) -> dict:
+    """RemoteGraph invoke: budget agent. Includes estimated total in metadata."""
     try:
         ingredients = state.get("ingredients", [])
         total = sum(
@@ -544,6 +584,11 @@ def call_budget_agent(state: AgentState) -> dict:
 
 
 def finish_node(state: AgentState) -> dict:
+    """Format ingredients into a markdown shopping list ``AIMessage``.
+
+    Groups by aisle, shows prices/availability, budget and diet status icons.
+    Returns a helpful error message when recipes or ingredients are missing.
+    """
     ingredients = state.get("ingredients", [])
     recipes = state.get("selected_recipes", [])
     store = state.get("store_name", "your store")
@@ -654,6 +699,7 @@ def finish_node(state: AgentState) -> dict:
 
 
 def build_graph():
+    """Wire supervisor StateGraph: parse → store → supervisor loop → finish."""
     builder = StateGraph(AgentState)
 
     builder.add_node("receive_message", receive_message)

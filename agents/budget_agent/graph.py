@@ -1,8 +1,10 @@
 """
 Budget Agent — validates total shopping cost against user budget.
-Pure Python, no LLM calls.
-Deployed as a standalone LangGraph server on port 22004 (local dev).
+
+Pure Python, no LLM calls. Deployed as standalone LangGraph server on port 22004.
 Called by supervisor via RemoteGraph.
+
+Integration spec: docs/agents/budget-agent.md
 """
 from langgraph.graph import END, START, StateGraph
 
@@ -11,7 +13,17 @@ from shared.state import AgentState
 
 
 def validate_budget(state: AgentState) -> dict:
-    """Check if total ingredient cost is within budget."""
+    """Sum ingredient prices and compare to ``request.budget_usd``.
+
+    Args:
+        state: Must contain ``ingredients`` (from shopping agent) and
+            ``request.budget_usd`` for validation to run.
+
+    Returns:
+        Partial state update with ``budget_status`` (``ok`` | ``over``),
+        ``constraint_violations`` when over budget, and updated ``agent_steps``.
+        Skips validation (``budget_agent:skipped``) when no budget is set.
+    """
     req = state.get("request") or {}
     budget = req.get("budget_usd") if isinstance(req, dict) \
         else getattr(req, "budget_usd", None)
@@ -51,6 +63,7 @@ def validate_budget(state: AgentState) -> dict:
 
 
 def build_graph():
+    """Compile the single-node budget validation graph."""
     builder = StateGraph(AgentState)
     builder.add_node("validate_budget", validate_budget)
     builder.add_edge(START, "validate_budget")

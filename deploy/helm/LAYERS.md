@@ -43,7 +43,7 @@ bash deploy/scripts/helm-deploy.sh recipe-agent local
 bash deploy/scripts/helm-deploy-all.sh local
 ```
 
-Value keys are documented in `charts/langgraph-primitives/values.yaml` and `charts/k8s-primitives/values.yaml`. Do not put secrets in configmap files — use per-agent secrets (`deploy/scripts/create-agent-secrets.sh` or `local-setup.sh`).
+Value keys are documented in `charts/langgraph-primitives/values.yaml` and `charts/k8s-primitives/values.yaml`. Do not put secrets in configmap files — use per-agent secrets (`deploy/scripts/create-agent-secrets.sh` or `local-k8s-setup.sh`).
 
 ## Platform workflow
 

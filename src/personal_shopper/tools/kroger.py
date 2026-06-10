@@ -1,3 +1,8 @@
+"""Kroger Developer API tools for store lookup and product availability.
+
+Requires ``KROGER_CLIENT_ID`` and ``KROGER_CLIENT_SECRET`` environment variables.
+Used when ``preferred_retailer`` maps to the Kroger family (kroger, ralphs, etc.).
+"""
 import os
 from typing import Any
 
@@ -6,6 +11,7 @@ from langchain_core.tools import tool
 
 
 def _get_kroger_client() -> KrogerAPI:
+    """Build an authenticated Kroger API client from environment credentials."""
     return KrogerAPI(
         client_id=os.environ["KROGER_CLIENT_ID"],
         client_secret=os.environ["KROGER_CLIENT_SECRET"],
@@ -14,7 +20,15 @@ def _get_kroger_client() -> KrogerAPI:
 
 @tool
 def find_nearest_store(zip_code: str) -> dict[str, Any]:
-    """Find the nearest Kroger store for a zip code."""
+    """Find the nearest Kroger-family store for a US zip code.
+
+    Args:
+        zip_code: Five-digit US postal code.
+
+    Returns:
+        Dict with ``location_id``, ``name``, ``address``, ``chain`` on success.
+        On failure returns ``location_id: None`` and an ``error`` string.
+    """
     try:
         kroger = _get_kroger_client()
         kroger.authorization.get_token_with_client_credentials("product.compact")
@@ -52,7 +66,16 @@ def find_nearest_store(zip_code: str) -> dict[str, Any]:
 
 @tool
 def check_product_availability(ingredient: str, location_id: str) -> dict[str, Any]:
-    """Check if an ingredient is available at a Kroger store."""
+    """Check if an ingredient is available at a specific Kroger store.
+
+    Args:
+        ingredient: Product search term (e.g. ``basil``, ``chicken breast``).
+        location_id: Kroger ``locationId`` from ``find_nearest_store``.
+
+    Returns:
+        Dict with ``ingredient``, ``available`` (bool), ``product_description``,
+        ``price`` (float or None), ``size``, and optional ``error``.
+    """
     try:
         kroger = _get_kroger_client()
         kroger.authorization.get_token_with_client_credentials("product.compact")

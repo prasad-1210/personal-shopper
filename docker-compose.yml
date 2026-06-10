@@ -1,7 +1,7 @@
 # LOCAL DEVELOPMENT PATHS:
 # PATH 1 — Fastest (no Docker):  bash scripts/dev-multiagent.sh
 # PATH 2 — Docker Compose:       docker compose up (all agents as services)
-# PATH 3 — Docker Desktop K8s:   bash deploy/scripts/local-setup.sh
+# PATH 3 — Docker Desktop K8s:   bash deploy/scripts/local-k8s-setup.sh
 
 version: "3.9"
 

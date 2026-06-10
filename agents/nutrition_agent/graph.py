@@ -1,22 +1,37 @@
 """
 Nutrition Agent — interprets dietary profile into concrete constraints.
-Deployed as a standalone LangGraph server on port 22001 (local dev).
+
+LLM-powered JSON constraint extraction. Port 22001 local dev.
 Called by supervisor via RemoteGraph.
+
+Integration spec: docs/agents/nutrition-agent.md
 """
 import json
 
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 
 from shared.distributed_tracing import export_traced_graph
+from shared.prompt_loader import chat_prompt
 from shared.state import AgentState
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 
 def interpret_constraints(state: AgentState) -> dict:
-    """Interpret dietary profile into concrete nutrition rules."""
+    """Convert dietary profile and calorie limit into structured JSON rules.
+
+    Skips the LLM when both ``dietary_profile`` and ``max_calories_per_serving``
+    are empty.
+
+    Args:
+        state: Requires ``request`` with optional ``dietary_profile`` and
+            ``max_calories_per_serving``.
+
+    Returns:
+        ``nutrition_constraints`` dict, ``nutrition_status`` (``ok``),
+        and ``agent_steps`` (``nutrition_agent`` or ``nutrition_agent:skipped``).
+    """
     req = state.get("request") or {}
     profile = req.get("dietary_profile", "") if isinstance(req, dict) \
         else getattr(req, "dietary_profile", "")
@@ -33,28 +48,7 @@ def interpret_constraints(state: AgentState) -> dict:
             "agent_steps": steps,
         }
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """Convert a dietary profile into concrete constraints.
-Return JSON only — no markdown, no extra text.
-Schema: {{"max_carbs_g": number|null, "max_calories": number|null,
-         "max_sugar_g": number|null,
-         "avoid_ingredients": [strings],
-         "notes": "string"}}
-
-Profiles:
-  diabetic    → max_carbs_g:45, max_sugar_g:25,
-                avoid:[sugar,honey,white rice,corn syrup,potatoes]
-  low-carb    → max_carbs_g:50, avoid:[bread,pasta,rice,potatoes,sugar]
-  keto        → max_carbs_g:20, avoid:[bread,pasta,rice,sugar,fruit,beans]
-  vegan       → avoid:[meat,chicken,fish,seafood,dairy,eggs,honey,gelatin]
-  vegetarian  → avoid:[meat,chicken,fish,seafood]
-  gluten-free → avoid:[wheat,barley,rye,bread,pasta,flour,soy sauce]
-  dairy-free  → avoid:[milk,cheese,butter,cream,yogurt,whey]"""),
-        ("human",
-         "Profile: {profile}\nMax calories per serving: {calories}"),
-    ])
-
-    result = (prompt | llm).invoke({
+    result = (chat_prompt("nutrition_constraints") | llm).invoke({
         "profile": profile or "none",
         "calories": str(max_cal) if max_cal else "not specified",
     })
@@ -76,6 +70,7 @@ Profiles:
 
 
 def build_graph():
+    """Compile the single-node nutrition interpretation graph."""
     builder = StateGraph(AgentState)
     builder.add_node("interpret_constraints", interpret_constraints)
     builder.add_edge(START, "interpret_constraints")

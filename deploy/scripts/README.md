@@ -24,23 +24,6 @@ bash deploy/scripts/local-k8s-setup.sh
 
 Remove the `agents-local` namespace stack or print pod/health status.
 
-### `local-setup.sh`
-
-**One-time** Docker Desktop Kubernetes bootstrap.
-
-1. Verifies `kubectl` context is `docker-desktop`
-2. Creates namespace `agents-dev` (default)
-3. Installs nginx ingress controller
-4. Installs Bitnami Redis and PostgreSQL in the namespace
-5. Builds all agent images via `scripts/build-agent-images.sh`
-6. Builds UI via `Dockerfile.ui`
-7. Creates per-agent secrets via `create-agent-secrets.sh`
-8. Runs `helm-deploy-all.sh local`
-
-```bash
-bash deploy/scripts/local-setup.sh
-```
-
 ### `create-agent-secrets.sh`
 
 Creates or updates Kubernetes secrets with API keys from `.env` and **per-agent** `REDIS_URI` / `DATABASE_URI` strings required by the Wolfi langgraph-api image.

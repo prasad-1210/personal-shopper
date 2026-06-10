@@ -4,9 +4,9 @@ Separate FastAPI server that talks to LangGraph over HTTP.
 
 ### Run locally (two terminals)
 
-Terminal 1 — LangGraph agent:
+Terminal 1 — LangGraph agents:
     cd /path/to/personal-shopper
-    langgraph dev
+    bash scripts/dev-multiagent.sh
 
 Terminal 2 — UI server:
     cd ui/

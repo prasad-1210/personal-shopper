@@ -1,7 +1,7 @@
 [project]
-name = "agent"
+name = "personal-shopper"
 version = "0.0.1"
-description = "Starter template for making a new agent LangGraph."
+description = "Multi-agent personal shopper built with LangGraph."
 authors = [
     { name = "William Fu-Hinthorn", email = "13333726+hinthornw@users.noreply.github.com" },
 ]
@@ -19,7 +19,15 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
+dev = [
+    "mypy>=1.11.1",
+    "ruff>=0.6.1",
+    "langgraph-cli[inmem]>=0.4.14",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "langsmith>=0.2",
+    "langchain-openai>=0.2",
+]
 
 [build-system]
 requires = ["setuptools>=73.0.0", "wheel"]
@@ -27,15 +35,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = [
-    "langgraph.templates.agent",
-    "agent",
     "personal_shopper",
     "personal_shopper.tools",
     "shared",
 ]
 [tool.setuptools.package-dir]
-"langgraph.templates.agent" = "src/agent"
-"agent" = "src/agent"
 "personal_shopper" = "src/personal_shopper"
 "personal_shopper.tools" = "src/personal_shopper/tools"
 "shared" = "shared"
@@ -43,6 +47,7 @@ packages = [
 
 [tool.setuptools.package-data]
 "*" = ["py.typed"]
+"shared" = ["prompts/*.md", "prompts/README.md"]
 
 [tool.ruff]
 lint.select = [
@@ -86,8 +91,6 @@ check_untyped_defs = true
 no_implicit_optional = true
 explicit_package_bases = true
 mypy_path = "."
-# Deprecated monolithic graph; active code is supervisor/ + agents/
-exclude = ["src/personal_shopper/graph\\.py", "src/agent/"]
 
 [[tool.mypy.overrides]]
 module = "kroger_api.*"

@@ -1,4 +1,4 @@
-from personal_shopper.state import ShoppingRequest
+from shared.state import ShoppingRequest
 
 
 def test_default_retailer():

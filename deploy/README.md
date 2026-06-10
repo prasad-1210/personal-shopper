@@ -41,16 +41,10 @@ bash deploy/scripts/local-k8s-status.sh
 bash deploy/scripts/local-k8s-teardown.sh
 ```
 
-**Legacy one-shot (namespace `agents-dev`):**
+Then open **http://localhost:8080** (UI port-forward from setup) or check status:
 
 ```bash
-bash deploy/scripts/local-setup.sh
-```
-
-Then open **http://localhost** (ingress) or port-forward the UI:
-
-```bash
-kubectl port-forward svc/ui 22005:22005 -n agents-dev
+bash deploy/scripts/local-k8s-status.sh
 ```
 
 ### Manual steps
